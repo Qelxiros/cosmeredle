@@ -13,10 +13,14 @@ use mediawiki::{
 use regex::{Captures, Regex};
 use serde_json::Value;
 
-use crate::{Character, Result, err};
+use crate::{
+    Character, Result,
+    cache::{CACHE, store_cache},
+    err,
+};
 
 static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?<brackets>\[\[([^\|\]]*?\|)?(.*?)\]\])(\{\{.*?\}\})?|(?<braces>\{\{([^\|\}]*\|)(.*?)\}\})|(?<small><small>(.*?)</small>)").unwrap()
+    Regex::new(r"(?<brackets>\[\[([^\|\]]*?\|)?(.*?)\]\])(\{\{.*?\}\})?|(?<braces>\{\{([^\|\}]*\|)([^\|]*?)(\|.*?)?\}\})(\{\{.*?\}\})?|(?<small><small>(.*?)</small>)").unwrap()
 });
 
 static TAGS: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| {
@@ -125,7 +129,7 @@ pub async fn get_character_pages() -> Result<HashSet<String>> {
 
 pub async fn get_character(name: &str) -> Result<Character> {
     let val = ActionApiQuery::revisions()
-        .titles(&[&*name])
+        .titles(&[name])
         .rvprop(&["ids", "content", "contentmodel", "timestamp", "flags"])
         .rvlimit(1)
         .rvdir("older")
@@ -137,9 +141,10 @@ pub async fn get_character(name: &str) -> Result<Character> {
         .as_object()
         .ok_or(err!("unexpected json structure {val}"))?;
     let page_id = pages.keys().next().ok_or(err!("no pages"))?;
-    let text =
-        try { pages[page_id]["revisions"].as_array()?.first()?["slots"]["main"]["*"].as_str()? }
-            .ok_or(err!("failed to get wikitext"))?;
+    let text = pages[page_id]["revisions"]
+        .as_array()
+        .and_then(|x| x.first().and_then(|x| x["slots"]["main"]["*"].as_str()))
+        .ok_or(err!("failed to get wikitext"))?;
 
     let map = parse_table(text).ok_or(err!("No table found"))?;
     let mut out = Character::default();
@@ -156,23 +161,18 @@ pub async fn get_character(name: &str) -> Result<Character> {
     Ok(out)
 }
 
-pub async fn sync_characters(
-    urls: HashSet<String>,
-    cache: &mut HashMap<String, Character>,
-) -> Result<bool> {
-    let mut out = false;
-
-    for url in urls {
-        if cache.contains_key(&url) {
+pub async fn sync_characters(names: HashSet<String>) -> Result<()> {
+    for name in names {
+        if CACHE.read().await.contains_key(&name) {
             continue;
         }
 
-        let character = get_character(&url).await;
+        let character = get_character(&name).await;
         if let Ok(ch) = character {
-            cache.insert(url, ch);
-            out = true;
+            CACHE.write().await.insert(name, ch);
+            let _ = store_cache().await;
         }
     }
 
-    Ok(out)
+    store_cache().await
 }

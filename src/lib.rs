@@ -1,11 +1,10 @@
-#![feature(try_blocks)]
-
 use std::{io, result, str::Utf8Error};
 
 use axum::{http::StatusCode, response::IntoResponse};
 use mediawiki::MediaWikiError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio_cron_scheduler::JobSchedulerError;
 
 pub mod answer;
 pub mod backend;
@@ -24,12 +23,12 @@ pub enum Error {
     CborDe(#[from] ciborium::de::Error<io::Error>),
     #[error("Serialization error: `{0}`")]
     CborSer(#[from] ciborium::ser::Error<io::Error>),
-    #[error("Failed to load .env file: `{0}`")]
-    Dotenvy(#[from] dotenvy::Error),
-    #[error("`{0}`")]
-    User(String),
+    #[error("Scheduler error: `{0}`")]
+    Sched(#[from] JobSchedulerError),
     #[error("`{0}`")]
     String(String),
+    #[error("`{0}`")]
+    User(String),
 }
 
 impl IntoResponse for Error {
@@ -40,11 +39,14 @@ impl IntoResponse for Error {
             | Self::Io(_)
             | Self::CborDe(_)
             | Self::CborSer(_)
-            | Self::Dotenvy(_)
-            | Self::String(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Odium's influence has blocked your request".to_string(),
-            ),
+            | Self::Sched(_)
+            | Self::String(_) => {
+                println!("{self}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Odium's influence has blocked your request".to_string(),
+                )
+            }
             Self::User(s) => (StatusCode::BAD_REQUEST, s),
         }
         .into_response()
@@ -60,7 +62,7 @@ macro_rules! err {
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Character {
     name: String,
     unnamed: bool,
@@ -145,7 +147,7 @@ impl Character {
             "'world" => self.tick_world = v,
             "universe" => self.universe = v,
             "introduced" => self.introduced = v,
-            _ => eprintln!("Unknown character key {k}"),
+            _ => {}
         }
     }
 

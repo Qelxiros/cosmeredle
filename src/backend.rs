@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fs::read_to_string};
 
-use axum::Json;
+use axum::{Json, response::Html};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{Result, answer::today, cache::CACHE, err};
+use crate::{Character, Result, answer::today, cache::CACHE, err};
 
 macro_rules! user_err {
     ($s:literal $(,$args:expr)*) => {
@@ -11,13 +12,18 @@ macro_rules! user_err {
     };
 }
 
-#[derive(Serialize, Deserialize)]
+#[axum::debug_handler]
+pub async fn home() -> Result<Html<String>> {
+    Ok(Html(read_to_string("src/index.html")?))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum BinaryStatus {
     Correct,
     Incorrect,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum TernaryStatus {
     Correct,
     Adjacent,
@@ -25,7 +31,7 @@ enum TernaryStatus {
 }
 
 // "the answer is a ... of your guess"
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum SetStatus {
     Equal,
     Overlap,
@@ -34,13 +40,41 @@ enum SetStatus {
     Disjoint,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CharacterWire {
+    name: String,
+    world: String,
+    introduced: String,
+    species: String,
+    nationality: String,
+    nation: String,
+    ethnicity: String,
+    abilities: Vec<String>,
+}
+
+impl From<Character> for CharacterWire {
+    fn from(value: Character) -> Self {
+        Self {
+            name: value.name,
+            world: value.world,
+            introduced: value.introduced,
+            species: value.species,
+            nationality: value.nationality,
+            nation: value.nation,
+            ethnicity: value.ethnicity,
+            abilities: value.abilities,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuessResponse {
     name: BinaryStatus,
     world: BinaryStatus,
     book: TernaryStatus,
     species: TernaryStatus,
     abilities: SetStatus,
+    character: CharacterWire,
 }
 
 #[axum::debug_handler]
@@ -100,7 +134,22 @@ pub async fn handle_guess(guess: Json<String>) -> Result<Json<GuessResponse>> {
                 }
             }
         },
+        character: guess.clone().into(),
     };
 
     Ok(Json(out))
+}
+
+pub async fn handle_list() -> Json<Vec<String>> {
+    Json(
+        CACHE
+            .read()
+            .await
+            .iter()
+            .filter(|(_, v)| v.universe == "Cosmere")
+            .map(|(k, _)| k)
+            .cloned()
+            .sorted_unstable()
+            .collect_vec(),
+    )
 }

@@ -16,29 +16,23 @@ pub static CACHE: LazyLock<RwLock<HashMap<String, Character>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub async fn load_cache() -> Result<()> {
-    let f = File::open("cache").unwrap();
+    let Ok(f) = File::open("storage/cache") else {
+        return Ok(());
+    };
     let map = from_reader(f)?;
     *CACHE.write().await = map;
     Ok(())
 }
 
 pub async fn store_cache() -> Result<()> {
-    let f = File::create("cache.new")?;
+    let f = File::create("storage/cache.new")?;
     into_writer(&*CACHE.read().await, f)?;
-    rename("cache.new", "cache")?;
+    rename("storage/cache.new", "storage/cache")?;
     Ok(())
 }
 
 pub async fn update_cache() -> Result<()> {
     load_cache().await?;
-    let characters = get_character_pages().await.unwrap();
-    let modified = sync_characters(characters, &mut *CACHE.write().await)
-        .await
-        .unwrap();
-
-    if modified {
-        store_cache().await?;
-    }
-
-    Ok(())
+    let characters = get_character_pages().await?;
+    sync_characters(characters).await
 }
