@@ -1,155 +1,48 @@
-use std::{collections::HashSet, fs::read_to_string};
+use axum_login::{AuthUser, AuthnBackend, UserId};
+use bcrypt::verify;
+use tokio::task;
 
-use axum::{Json, response::Html};
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use crate::{
+    Error,
+    db::{self},
+    server,
+};
 
-use crate::{Character, Result, answer::today, cache::CACHE, err};
+#[derive(Clone, Copy)]
+pub struct Backend;
 
-macro_rules! user_err {
-    ($s:literal $(,$args:expr)*) => {
-        $crate::Error::User(format!($s, $($args),*))
-    };
-}
+impl AuthUser for db::User {
+    type Id = String;
 
-#[axum::debug_handler]
-pub async fn home() -> Result<Html<String>> {
-    Ok(Html(read_to_string("src/index.html")?))
-}
+    fn id(&self) -> Self::Id {
+        self.username.clone()
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum BinaryStatus {
-    Correct,
-    Incorrect,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum TernaryStatus {
-    Correct,
-    Adjacent,
-    Incorrect,
-}
-
-// "the answer is a ... of your guess"
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum SetStatus {
-    Equal,
-    Overlap,
-    Subset,
-    Superset,
-    Disjoint,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct CharacterWire {
-    name: String,
-    world: String,
-    introduced: String,
-    species: String,
-    nationality: String,
-    nation: String,
-    ethnicity: String,
-    abilities: Vec<String>,
-}
-
-impl From<Character> for CharacterWire {
-    fn from(value: Character) -> Self {
-        Self {
-            name: value.name,
-            world: value.world,
-            introduced: value.introduced,
-            species: value.species,
-            nationality: value.nationality,
-            nation: value.nation,
-            ethnicity: value.ethnicity,
-            abilities: value.abilities,
-        }
+    fn session_auth_hash(&self) -> &[u8] {
+        self.bcrypt.as_bytes()
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GuessResponse {
-    name: BinaryStatus,
-    world: BinaryStatus,
-    book: TernaryStatus,
-    species: TernaryStatus,
-    abilities: SetStatus,
-    character: CharacterWire,
+impl AuthnBackend for Backend {
+    type User = db::User;
+    type Credentials = server::Auth;
+    type Error = Error;
+
+    async fn authenticate(
+        &self,
+        creds: Self::Credentials,
+    ) -> Result<Option<Self::User>, Self::Error> {
+        let user = db::get_user(&creds.username).await?;
+
+        task::spawn_blocking(|| {
+            Ok(user.filter(|user| verify(creds.password, &user.bcrypt).is_ok_and(|b| b)))
+        })
+        .await?
+    }
+
+    async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
+        db::get_user(user_id).await
+    }
 }
 
-#[axum::debug_handler]
-pub async fn handle_guess(guess: Json<String>) -> Result<Json<GuessResponse>> {
-    let cache = CACHE.read().await;
-
-    let guess = cache
-        .get(&*guess)
-        .ok_or(user_err!("unrecognized character"))?;
-
-    let answer = cache
-        .get(&today().await)
-        .ok_or(err!("Missing answer details"))?;
-
-    let out = GuessResponse {
-        name: if guess.name == answer.name {
-            BinaryStatus::Correct
-        } else {
-            BinaryStatus::Incorrect
-        },
-        world: if guess.world == answer.world {
-            BinaryStatus::Correct
-        } else {
-            BinaryStatus::Incorrect
-        },
-        book: if guess.introduced == answer.introduced {
-            TernaryStatus::Correct
-        } else {
-            TernaryStatus::Incorrect
-        },
-        species: if guess.species == answer.species {
-            if guess.nation == answer.nation
-                && guess.nationality == answer.nationality
-                && guess.ethnicity == answer.ethnicity
-            {
-                TernaryStatus::Correct
-            } else {
-                TernaryStatus::Adjacent
-            }
-        } else {
-            TernaryStatus::Incorrect
-        },
-        abilities: {
-            let ga = guess.abilities.iter().collect::<HashSet<_>>();
-            let aa = answer.abilities.iter().collect::<HashSet<_>>();
-
-            match (ga.is_subset(&aa), aa.is_subset(&ga)) {
-                (true, true) => SetStatus::Equal,
-                (true, false) => SetStatus::Superset,
-                (false, true) => SetStatus::Subset,
-                (false, false) => {
-                    if ga.intersection(&aa).next().is_some() {
-                        SetStatus::Overlap
-                    } else {
-                        SetStatus::Disjoint
-                    }
-                }
-            }
-        },
-        character: guess.clone().into(),
-    };
-
-    Ok(Json(out))
-}
-
-pub async fn handle_list() -> Json<Vec<String>> {
-    Json(
-        CACHE
-            .read()
-            .await
-            .iter()
-            .filter(|(_, v)| v.universe == "Cosmere")
-            .map(|(k, _)| k)
-            .cloned()
-            .sorted_unstable()
-            .collect_vec(),
-    )
-}
+pub type AuthSession = axum_login::AuthSession<Backend>;

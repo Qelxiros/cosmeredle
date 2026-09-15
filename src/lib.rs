@@ -1,30 +1,44 @@
 use std::{io, result, str::Utf8Error};
 
 use axum::{http::StatusCode, response::IntoResponse};
+use axum_login::tower_sessions::session_store;
+use bcrypt::BcryptError;
 use mediawiki::MediaWikiError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::task::JoinError;
 use tokio_cron_scheduler::JobSchedulerError;
 
 pub mod answer;
 pub mod backend;
 pub mod cache;
+pub mod db;
+pub mod server;
 pub mod wiki;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Coppermind error: `{0}`")]
-    MediaWiki(#[from] MediaWikiError),
-    #[error("Invalid UTF-8 encountered")]
-    Utf8(#[from] Utf8Error),
-    #[error("I/O error: `{0}`")]
-    Io(#[from] io::Error),
+    #[error("Password encryption/decryption error: `{0}`")]
+    Bcrypt(#[from] BcryptError),
     #[error("Deserialization error: `{0}`")]
     CborDe(#[from] ciborium::de::Error<io::Error>),
     #[error("Serialization error: `{0}`")]
     CborSer(#[from] ciborium::ser::Error<io::Error>),
+    #[error("I/O error: `{0}`")]
+    Io(#[from] io::Error),
+    #[error("Tokio join error: `{0}`")]
+    Join(#[from] JoinError),
+    #[error("Coppermind error: `{0}`")]
+    MediaWiki(#[from] MediaWikiError),
     #[error("Scheduler error: `{0}`")]
     Sched(#[from] JobSchedulerError),
+    #[error("Error storing sessions: `{0}`")]
+    SessionStore(#[from] session_store::Error),
+    #[error("Database error: `{0}`")]
+    Sql(#[from] sqlx::Error),
+    #[error("Invalid UTF-8 encountered")]
+    Utf8(#[from] Utf8Error),
+
     #[error("`{0}`")]
     String(String),
     #[error("`{0}`")]
@@ -34,12 +48,16 @@ pub enum Error {
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         match self {
-            Self::MediaWiki(_)
-            | Self::Utf8(_)
-            | Self::Io(_)
+            Self::Bcrypt(_)
             | Self::CborDe(_)
             | Self::CborSer(_)
+            | Self::Io(_)
+            | Self::Join(_)
+            | Self::MediaWiki(_)
             | Self::Sched(_)
+            | Self::SessionStore(_)
+            | Self::Sql(_)
+            | Self::Utf8(_)
             | Self::String(_) => {
                 println!("{self}");
                 (
@@ -162,5 +180,6 @@ impl Character {
 
 pub async fn init() -> Result<()> {
     wiki::init().await?;
+    db::init().await?;
     Ok(())
 }

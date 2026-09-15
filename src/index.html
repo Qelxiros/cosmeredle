@@ -1,411 +1,761 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cosmeredle</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f111a;
-            color: #e2e8f0;
-            overflow-x: hidden;
-            min-height: 100vh;
-        }
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #0f111a;
+        color: #e2e8f0;
+        overflow-x: hidden;
+        min-height: 100vh;
+      }
 
-        h1, h2, h3, .cinzel {
-            font-family: 'Cinzel', serif;
-        }
+      h1,
+      h2,
+      h3,
+      .cinzel {
+        font-family: "Cinzel", serif;
+      }
 
-        /* Mist Background Effect */
-        .mist-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            pointer-events: none;
-            z-index: -1;
-            overflow: hidden;
-        }
+      .mist-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none;
+        z-index: -1;
+        overflow: hidden;
+      }
 
-        .mist {
-            position: absolute;
-            width: 200vw;
-            height: 200vh;
-            top: -50vh;
-            left: -50vw;
-            background: radial-gradient(circle at center, rgba(76, 29, 149, 0.15) 0%, rgba(30, 58, 138, 0.05) 40%, transparent 70%);
-            animation: drift 20s infinite alternate ease-in-out;
-        }
+      .mist {
+        position: absolute;
+        width: 200vw;
+        height: 200vh;
+        top: -50vh;
+        left: -50vw;
+        background: radial-gradient(
+          circle at center,
+          rgba(76, 29, 149, 0.15) 0%,
+          rgba(30, 58, 138, 0.05) 40%,
+          transparent 70%
+        );
+        animation: drift 20s infinite alternate ease-in-out;
+      }
 
-        .mist:nth-child(2) {
-            background: radial-gradient(circle at 70% 30%, rgba(55, 48, 163, 0.1) 0%, transparent 60%);
-            animation: drift 25s infinite alternate-reverse ease-in-out;
-        }
+      .mist:nth-child(2) {
+        background: radial-gradient(
+          circle at 70% 30%,
+          rgba(55, 48, 163, 0.1) 0%,
+          transparent 60%
+        );
+        animation: drift 25s infinite alternate-reverse ease-in-out;
+      }
 
-        @keyframes drift {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(5%, 5%) scale(1.1); }
+      @keyframes drift {
+        0% {
+          transform: translate(0, 0) scale(1);
         }
-
-        /* Cell Flip Animation */
-        .flip-animate {
-            animation: flipIn 0.6s ease forwards;
-            opacity: 0;
-            transform: rotateX(-90deg);
+        100% {
+          transform: translate(5%, 5%) scale(1.1);
         }
+      }
 
-        @keyframes flipIn {
-            0% { transform: rotateX(-90deg); opacity: 0; }
-            100% { transform: rotateX(0); opacity: 1; }
+      .flip-animate {
+        animation: flipIn 0.6s ease forwards;
+        opacity: 0;
+        transform: rotateX(-90deg);
+      }
+
+      .no-animate {
+        opacity: 1;
+        transform: rotateX(0);
+      }
+
+      @keyframes flipIn {
+        0% {
+          transform: rotateX(-90deg);
+          opacity: 0;
         }
+        100% {
+          transform: rotateX(0);
+          opacity: 1;
+        }
+      }
 
-        /* Grid Layout */
+      .guess-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.5rem;
+        width: 100%;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      @media (max-width: 768px) {
         .guess-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 0.5rem;
-            width: 100%;
-            max-width: 1000px;
-            margin: 0 auto;
+          grid-template-columns: repeat(5, minmax(60px, 1fr));
+          gap: 0.25rem;
+          font-size: 0.75rem;
         }
+      }
 
-        @media (max-width: 768px) {
-            .guess-grid {
-                grid-template-columns: repeat(5, minmax(60px, 1fr));
-                gap: 0.25rem;
-                font-size: 0.75rem;
-            }
-        }
+      .cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0.75rem 0.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        min-height: 80px;
+        word-break: break-word;
+      }
 
-        .cell {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 0.75rem 0.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            min-height: 80px;
-            word-break: break-word;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f111a; }
-        ::-webkit-scrollbar-thumb { background: #312e81; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #4338ca; }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f111a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #312e81;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #4338ca;
+      }
     </style>
-</head>
-<body class="flex flex-col items-center py-10 px-4">
-
+  </head>
+  <body class="flex flex-col items-center py-10 px-4 relative">
     <div class="mist-container">
-        <div class="mist"></div>
-        <div class="mist"></div>
+      <div class="mist"></div>
+      <div class="mist"></div>
     </div>
 
-    <header class="text-center mb-8">
-        <h1 class="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-2 drop-shadow-lg">
-            Cosmeredle
-        </h1>
+    <header
+      class="w-full max-w-5xl flex justify-between items-start mb-8 relative z-20"
+    >
+      <div class="w-24"></div>
+      <!-- Spacer for centering -->
+      <h1
+        class="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 text-center drop-shadow-lg"
+      >
+        Cosmeredle
+      </h1>
+
+      <div id="auth-container" class="relative">
+        <div id="auth-buttons" class="flex gap-3">
+          <button
+            onclick="openAuthModal('login')"
+            class="px-4 py-2 text-sm font-medium rounded-md bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors"
+          >
+            Log In
+          </button>
+          <button
+            onclick="openAuthModal('signup')"
+            class="px-4 py-2 text-sm font-medium rounded-md bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-colors shadow-lg"
+          >
+            Sign Up
+          </button>
+        </div>
+        <div id="user-info" class="hidden flex-col items-end gap-1">
+          <span
+            id="user-email"
+            class="text-sm text-blue-300 font-medium tracking-wide"
+            >Authenticated</span
+          >
+          <button
+            id="logout-btn"
+            class="text-xs text-slate-400 hover:text-white underline transition-colors"
+          >
+            Log Out
+          </button>
+        </div>
+      </div>
     </header>
 
-    <main class="w-full max-w-5xl flex flex-col items-center">
-        <form id="guess-form" class="w-full max-w-md flex gap-2 mb-10 relative z-10">
-            <input 
-                type="text" 
-                id="guess-input" 
-                placeholder="Enter character name..." 
-                class="flex-1 bg-slate-800/80 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-inner"
-                required
-                autocomplete="off"
-                autofocus
-            >
-            <button 
-                type="submit" 
-                class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg transform hover:scale-105 active:scale-95"
-            >
-                Guess
-            </button>
-            
-            <!-- Autocomplete Dropdown -->
-            <ul id="autocomplete-list" class="absolute top-full left-0 w-[calc(100%-105px)] mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto hidden z-50"></ul>
+    <div
+      id="auth-modal"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-300"
+    >
+      <div
+        class="bg-slate-900 border border-slate-700 p-8 rounded-xl shadow-2xl max-w-md w-full relative transform scale-95 transition-transform duration-300"
+        id="auth-modal-content"
+      >
+        <button
+          onclick="closeAuthModal()"
+          class="absolute top-4 right-4 text-slate-400 hover:text-white"
+        >
+          &times;
+        </button>
+        <h2
+          id="auth-title"
+          class="cinzel text-2xl mb-6 text-center text-blue-400"
+        >
+          Log In
+        </h2>
+        <form id="auth-form" class="flex flex-col gap-4">
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Username</label>
+            <input
+              type="text"
+              id="auth-username"
+              class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Password</label>
+            <input
+              type="password"
+              id="auth-password"
+              class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            id="auth-submit-btn"
+            class="mt-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-2 px-4 rounded transition-all"
+          >
+            Submit
+          </button>
         </form>
+      </div>
+    </div>
 
-        <div class="w-full">
-            <div class="guess-grid mb-2 text-slate-300 cinzel text-sm md:text-base hidden sm:grid">
-                <div class="text-center font-bold tracking-wider border-b border-slate-600 pb-2">Name</div>
-                <div class="text-center font-bold tracking-wider border-b border-slate-600 pb-2">Home World</div>
-                <div class="text-center font-bold tracking-wider border-b border-slate-600 pb-2">Introduced In</div>
-                <div class="text-center font-bold tracking-wider border-b border-slate-600 pb-2">Species (Subspecies)</div>
-                <div class="text-center font-bold tracking-wider border-b border-slate-600 pb-2">Abilities / Investiture</div>
-            </div>
-            
-            <!-- Container for the guess rows -->
-            <div id="guesses-container" class="flex flex-col gap-2">
-                <!-- Dynamic rows will be inserted here -->
-            </div>
+    <main class="w-full max-w-5xl flex flex-col items-center z-10 relative">
+      <form id="guess-form" class="w-full max-w-md flex gap-2 mb-10 relative">
+        <input
+          type="text"
+          id="guess-input"
+          placeholder="Enter character name..."
+          class="flex-1 bg-slate-800/80 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-inner"
+          required
+          autocomplete="off"
+          autofocus
+        />
+        <button
+          type="submit"
+          class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg transform hover:scale-105 active:scale-95"
+        >
+          Guess
+        </button>
+
+        <!-- Autocomplete Dropdown -->
+        <ul
+          id="autocomplete-list"
+          class="absolute top-full left-0 w-[calc(100%-105px)] mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto hidden z-50"
+        ></ul>
+      </form>
+
+      <div class="w-full">
+        <div
+          class="guess-grid mb-2 text-slate-300 cinzel text-sm md:text-base hidden sm:grid"
+        >
+          <div
+            class="text-center font-bold tracking-wider border-b border-slate-600 pb-2"
+          >
+            Name
+          </div>
+          <div
+            class="text-center font-bold tracking-wider border-b border-slate-600 pb-2"
+          >
+            Home World
+          </div>
+          <div
+            class="text-center font-bold tracking-wider border-b border-slate-600 pb-2"
+          >
+            Introduced In
+          </div>
+          <div
+            class="text-center font-bold tracking-wider border-b border-slate-600 pb-2"
+          >
+            Species
+          </div>
+          <div
+            class="text-center font-bold tracking-wider border-b border-slate-600 pb-2"
+          >
+            Abilities
+          </div>
         </div>
-        
-        <!-- Legend -->
-        <div class="mt-12 p-4 bg-slate-800/50 rounded-xl border border-slate-700 max-w-3xl w-full">
-            <h3 class="cinzel text-lg text-center mb-4 text-slate-300">Legend</h3>
-            <div class="flex flex-wrap justify-center gap-4 text-sm">
-                <div class="flex items-center gap-2"><div class="w-4 h-4 rounded bg-green-600"></div> Correct</div>
-                <div class="flex items-center gap-2"><div class="w-4 h-4 rounded bg-gray-700"></div> Incorrect</div>
-                <div class="flex items-center gap-2"><div class="w-4 h-4 rounded bg-yellow-600"></div> Adjacent / Overlap</div>
-                <div class="flex items-center gap-2"><div class="w-4 h-4 rounded bg-blue-600"></div> Subset (Needs fewer)</div>
-                <div class="flex items-center gap-2"><div class="w-4 h-4 rounded bg-purple-600"></div> Superset (Needs more)</div>
-            </div>
+
+        <div id="guesses-container" class="flex flex-col gap-2">
+          <!-- Dynamic rows will be inserted here -->
         </div>
+      </div>
+
+      <div
+        class="mt-12 p-4 bg-slate-800/50 rounded-xl border border-slate-700 max-w-3xl w-full"
+      >
+        <h3 class="cinzel text-lg text-center mb-4 text-slate-300">Legend</h3>
+        <div class="flex flex-wrap justify-center gap-4 text-sm">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-green-600"></div>
+            Correct / Equal
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-gray-700"></div>
+            Incorrect / Disjoint
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-yellow-600"></div>
+            Adjacent / Overlap
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-blue-600"></div>
+            Subset (Needs fewer)
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-purple-600"></div>
+            Superset (Needs more)
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- Toast Notification Container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <div
+      id="toast-container"
+      class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
+    ></div>
 
     <script>
-        const form = document.getElementById('guess-form');
-        const input = document.getElementById('guess-input');
-        const container = document.getElementById('guesses-container');
-        const autocompleteList = document.getElementById('autocomplete-list');
+      const form = document.getElementById("guess-form");
+      const input = document.getElementById("guess-input");
+      const container = document.getElementById("guesses-container");
+      const autocompleteList = document.getElementById("autocomplete-list");
 
-        function showToast(message) {
-            const toast = document.createElement('div');
-            toast.className = 'bg-red-600/90 border border-red-500 text-white px-5 py-3 rounded-lg shadow-lg transition-opacity duration-300 pointer-events-auto backdrop-blur-sm';
-            toast.textContent = message;
-            
-            const toastContainer = document.getElementById('toast-container');
-            toastContainer.appendChild(toast);
+      let characterNames = [];
+      let activeSuggestionIndex = -1;
+      let todayGuesses = [];
 
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
+      // Maps statuses to Tailwind CSS background colors
+      const colorMap = {
+        Correct: "bg-green-600 text-white",
+        Equal: "bg-green-600 text-white",
+        Incorrect: "bg-gray-700 text-slate-300",
+        Disjoint: "bg-gray-700 text-slate-300",
+        Adjacent: "bg-yellow-600 text-white",
+        Overlap: "bg-yellow-600 text-white",
+        Subset: "bg-blue-600 text-white",
+        Superset: "bg-purple-600 text-white",
+      };
+
+      const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+      // Get current date in US Eastern Time formatted as YYYY-MM-DD
+      function getEasternDateString() {
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        });
+        const parts = formatter.formatToParts(new Date());
+        const year = parts.find((p) => p.type === "year").value;
+        const month = parts.find((p) => p.type === "month").value;
+        const day = parts.find((p) => p.type === "day").value;
+        return `${year}-${month}-${day}`;
+      }
+
+      const storageKey = `cosmeredle_state_${getEasternDateString()}`;
+
+      function loadState() {
+        const savedState = localStorage.getItem(storageKey);
+        if (savedState) {
+          try {
+            todayGuesses = JSON.parse(savedState);
+            // Render historical guesses immediately without animation delays
+            todayGuesses.forEach((guess) => renderGuess(guess, true));
+          } catch (e) {
+            console.error("Failed to parse local storage", e);
+            todayGuesses = [];
+          }
+        }
+      }
+
+      function saveState(guessData) {
+        todayGuesses.push(guessData);
+        localStorage.setItem(storageKey, JSON.stringify(todayGuesses));
+      }
+
+      function showToast(message, error = true) {
+        const toast = document.createElement("div");
+        const bgColor = error
+          ? "bg-red-600/90 border-red-500"
+          : "bg-green-600/90 border-green-500";
+        toast.className = `${bgColor} border text-white px-5 py-3 rounded-lg shadow-lg transition-opacity duration-300 pointer-events-auto backdrop-blur-sm`;
+        toast.textContent = message;
+
+        const toastContainer = document.getElementById("toast-container");
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+          toast.style.opacity = "0";
+          setTimeout(() => toast.remove(), 300);
+        }, 4000);
+      }
+
+      const authForm = document.getElementById("auth-form");
+      const authModal = document.getElementById("auth-modal");
+      const authModalContent = document.getElementById("auth-modal-content");
+      const authTitle = document.getElementById("auth-title");
+      const authSubmitBtn = document.getElementById("auth-submit-btn");
+
+      function openAuthModal(type) {
+        currentAuthMode = type;
+        authTitle.textContent =
+          currentAuthMode === "login" ? "Log In" : "Sign Up";
+        authSubmitBtn.textContent =
+          currentAuthMode === "login" ? "Log In" : "Create Account";
+        authModal.classList.remove("hidden");
+        // Small delay to allow display block to apply before transition
+        setTimeout(() => {
+          authModal.classList.remove("opacity-0");
+          authModalContent.classList.remove("scale-95");
+        }, 10);
+      }
+
+      function closeAuthModal() {
+        authForm.reset();
+        authModal.classList.add("opacity-0");
+        authModalContent.classList.add("scale-95");
+        setTimeout(() => {
+          authModal.classList.add("hidden");
+        }, 300);
+      }
+
+      authModal.addEventListener("click", (e) => {
+        if (e.target === authModal) closeAuthModal();
+      });
+
+      async function fetchCharacters() {
+        try {
+          const response = await fetch("/list");
+          if (!response.ok) throw new Error(`Status ${response.status}`);
+          characterNames = await response.json();
+        } catch (error) {
+          showToast("Failed to fetch character list: " + error.message);
+        }
+      }
+
+      fetchCharacters();
+      loadState();
+
+      input.addEventListener("input", (e) => {
+        const val = e.target.value;
+        autocompleteList.innerHTML = "";
+        activeSuggestionIndex = -1;
+
+        if (!val) {
+          autocompleteList.classList.add("hidden");
+          return;
         }
 
-        let characterNames = [];
-        let activeSuggestionIndex = -1;
+        const matches = characterNames.filter((name) =>
+          name.toLowerCase().includes(val.toLowerCase()),
+        );
 
-        async function fetchCharacters() {
-            try {
-                const response = await fetch('/list');
-                if (!response.ok) throw new Error(`Status ${response.status}`);
-                characterNames = await response.json();
-            } catch (error) {
-                showToast('Failed to fetch character list: ' + error.message);
-            }
-        }
-        
-        // Fetch on load
-        fetchCharacters();
+        matches.sort((a, b) => {
+          const valLower = val.toLowerCase();
+          const aLower = a.toLowerCase();
+          const bLower = b.toLowerCase();
+          // Prioritize exact match
+          if (aLower === valLower && bLower !== valLower) return -1;
+          if (bLower === valLower && aLower !== valLower) return 1;
+          return 0;
+        });
 
-        // Autocomplete filtering
-        const events = ['input', 'click'];
-        events.forEach(event => {
-            input.addEventListener(event, (e) => {
-                const val = e.target.value;
-                autocompleteList.innerHTML = '';
-                activeSuggestionIndex = -1;
-                
-                const matches = characterNames.filter(name => name.toLowerCase().includes(val.toLowerCase()));
-                
-                matches.sort((a, b) => {
-                    const valLower = val.toLowerCase();
-                    if (a.toLowerCase() === valLower && b.toLowerCase() !== valLower) return -1;
-                    if (b.toLowerCase() === valLower && a.toLowerCase() !== valLower) return 1;
-                    return 0;
-                });
-                
-                if (matches.length > 0) {
-                    autocompleteList.classList.remove('hidden');
-                    matches.forEach((match, index) => {
-                        const li = document.createElement('li');
-                        li.className = 'px-4 py-2 hover:bg-slate-700 cursor-pointer text-slate-200 border-b border-slate-700/50 last:border-0 transition-colors';
-                        li.textContent = match;
-                        li.addEventListener('click', () => {
-                            input.value = match;
-                            autocompleteList.classList.add('hidden');
-                            input.focus();
-                        });
-                        autocompleteList.appendChild(li);
-                    });
-                } else {
-                    autocompleteList.classList.add('hidden');
-                }
+        if (matches.length > 0) {
+          autocompleteList.classList.remove("hidden");
+          matches.slice(0, 15).forEach((match, index) => {
+            const li = document.createElement("li");
+            li.className =
+              "px-4 py-2 hover:bg-slate-700 cursor-pointer text-slate-200 border-b border-slate-700/50 last:border-0 transition-colors";
+            li.textContent = match;
+            li.addEventListener("click", () => {
+              input.value = match;
+              autocompleteList.classList.add("hidden");
+              input.focus();
             });
-        })
-
-        // Keyboard navigation (Up/Down, Enter/Tab)
-        input.addEventListener('keydown', (e) => {
-            const items = autocompleteList.querySelectorAll('li');
-            if (autocompleteList.classList.contains('hidden') || items.length === 0) return;
-
-            if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
-                e.preventDefault();
-                activeSuggestionIndex++;
-                if (activeSuggestionIndex >= items.length) activeSuggestionIndex = 0;
-                updateActiveSuggestion(items);
-            } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
-                e.preventDefault();
-                activeSuggestionIndex--;
-                if (activeSuggestionIndex < 0) activeSuggestionIndex = items.length - 1;
-                updateActiveSuggestion(items);
-            } else if (e.key === 'Enter') {
-                if (activeSuggestionIndex > -1) {
-                    e.preventDefault();
-                    input.value = items[activeSuggestionIndex].textContent;
-                    autocompleteList.classList.add('hidden');
-                }
-            } else if (e.key === 'Escape') {
-                autocompleteList.classList.add('hidden');
-            }
-        });
-
-        input.addEventListener('click', (e) => autocompleteList.classList.remove('hidden'));
-
-        function updateActiveSuggestion(items) {
-            items.forEach(item => item.classList.remove('bg-slate-600', 'text-white'));
-            if (activeSuggestionIndex > -1) {
-                items[activeSuggestionIndex].classList.add('bg-slate-600', 'text-white');
-                items[activeSuggestionIndex].scrollIntoView({ block: 'nearest' });
-            }
+            autocompleteList.appendChild(li);
+          });
+        } else {
+          autocompleteList.classList.add("hidden");
         }
-        
-        // Hide autocomplete when clicking outside
-        document.addEventListener('click', (e) => {
-            if (e.target !== input && e.target !== autocompleteList) {
-                autocompleteList.classList.add('hidden');
-            }
-        });
+      });
 
-        // Global keydown event to auto-focus the input box
-        document.addEventListener('keydown', (e) => {
-            // Ignore if the user is already focused on an input element
-            if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-            
-            // Check if it's a single alphabetic character, ignoring combinations (ctrl, alt, meta)
-            if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                input.focus();
-                // The browser will naturally apply the keystroke to the focused element
-            }
-        });
+      input.addEventListener("keydown", (e) => {
+        const items = autocompleteList.querySelectorAll("li");
+        if (autocompleteList.classList.contains("hidden") || items.length === 0)
+          return;
 
-        // Maps statuses to Tailwind CSS background colors
-        const colorMap = {
-            'Correct': 'bg-green-600 text-white',
-            'Equal': 'bg-green-600 text-white',
-            
-            'Incorrect': 'bg-gray-700 text-slate-300',
-            'Disjoint': 'bg-gray-700 text-slate-300',
-            
-            'Adjacent': 'bg-yellow-600 text-white',
-            'Overlap': 'bg-yellow-600 text-white',
-            
-            'Subset': 'bg-blue-600 text-white',
-            
-            'Superset': 'bg-purple-600 text-white'
-        };
-
-        // Delay utility for animations
-        const delay = ms => new Promise(res => setTimeout(res, ms));
-
-        form.addEventListener('submit', async (e) => {
+        if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
+          e.preventDefault(); // Prevent tab from leaving input
+          activeSuggestionIndex++;
+          if (activeSuggestionIndex >= items.length) activeSuggestionIndex = 0;
+          updateActiveSuggestion(items);
+        } else if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) {
+          e.preventDefault(); // Prevent shift+tab from leaving input
+          activeSuggestionIndex--;
+          if (activeSuggestionIndex < 0)
+            activeSuggestionIndex = items.length - 1;
+          updateActiveSuggestion(items);
+        } else if (e.key === "Enter") {
+          if (activeSuggestionIndex > -1) {
             e.preventDefault();
-            const guessName = input.value.trim();
-            if (!guessName) return;
-            
-            // Clear input and disable temporarily
-            input.value = '';
-            input.disabled = true;
-            autocompleteList.classList.add('hidden');
+            input.value = items[activeSuggestionIndex].textContent;
+            autocompleteList.classList.add("hidden");
+          }
+        } else if (e.key === "Escape") {
+          autocompleteList.classList.add("hidden");
+        }
+      });
 
-            try {
-                // Attempt to reach real backend
-                const response = await fetch('/guess', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(guessName)
-                });
+      function updateActiveSuggestion(items) {
+        items.forEach((item) =>
+          item.classList.remove("bg-slate-600", "text-white"),
+        );
+        if (activeSuggestionIndex > -1) {
+          items[activeSuggestionIndex].classList.add(
+            "bg-slate-600",
+            "text-white",
+          );
+          items[activeSuggestionIndex].scrollIntoView({ block: "nearest" });
+        }
+      }
 
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
+      // Hide autocomplete when clicking outside
+      document.addEventListener("click", (e) => {
+        if (e.target !== input && e.target !== autocompleteList) {
+          autocompleteList.classList.add("hidden");
+        }
+      });
 
-                const data = await response.json();
-                await renderGuess(data);
-                
-            } catch (error) {
-                showToast('Failed to submit guess: ' + error.message);
-                console.warn(error.message);
-            } finally {
-                input.disabled = false;
-                input.focus();
-            }
-        });
+      // Global keydown event to auto-focus the input box
+      document.addEventListener("keydown", (e) => {
+        // Ignore if the user is already focused on an input element (like auth form)
+        if (
+          document.activeElement &&
+          document.activeElement.tagName === "INPUT"
+        )
+          return;
 
-        async function renderGuess(guessData) {
-            const { name: name_res, world: world_res, book: book_res, species: species_res, abilities: abilities_res, character } = guessData;
+        // Check if it's a single alphabetic character, ignoring combinations (ctrl, alt, meta)
+        if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          // Focus will naturally let the browser append the character to the input
+          input.focus();
+        }
+      });
 
-            // Create row container
-            const row = document.createElement('div');
-            row.className = 'guess-grid';
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const guessName = input.value.trim();
+        if (!guessName) return;
 
-            var subspecies = character.nationality
-            if (!subspecies) {
-              subspecies = character.nation
-            }
-            if (!subspecies) {
-              subspecies = character.ethnicity
-            }
-            
-            var species = character.species
-            if (!species) {
-              species = "Human"
-            }
+        input.value = "";
+        input.disabled = true;
+        autocompleteList.classList.add("hidden");
 
-            if (subspecies) {
-              species = `${species} (${subspecies})`
-            }
-            
-            // Prepare cell data
-            const cells = [
-                { value: character.name, status: name_res },
-                { value: character.world, status: world_res },
-                { value: character.introduced, status: book_res }, // 'book' status applies to 'introduced'
-                { value: species, status: species_res },
-                { value: character.abilities.join(', ') || 'Uninvested', status: abilities_res }
-            ];
+        try {
+          const headers = { "Content-Type": "application/json" };
+          const token = localStorage.getItem("jwt_token");
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+          const response = await fetch("/guess", {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify(guessName),
+          });
 
-            // Append cells with staggered animation
-            for (let i = 0; i < cells.length; i++) {
-                const cellData = cells[i];
-                const cell = document.createElement('div');
-                
-                // Base classes + color mapped classes + animation class
-                const colorClasses = colorMap[cellData.status] || 'bg-gray-700';
-                cell.className = `cell ${colorClasses} flip-animate`;
-                
-                // Add staggered delay based on index
-                cell.style.animationDelay = `${i * 0.15}s`;
-                
-                // Add mobile labels (visible only on very small screens if styled, but mostly just relying on grid)
-                cell.innerHTML = `<span class="drop-shadow-md text-sm md:text-base">${cellData.value}</span>`;
-                
-                row.appendChild(cell);
-            }
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+          }
 
-            // Prepend the new guess to the top of the container
-            container.insertBefore(row, container.firstChild);
-            
-            // Wait for animations to finish before allowing rapid fire guesses
-            await delay(cells.length * 150 + 600);
+          const data = await response.json();
+
+          // Save to local storage for the day
+          saveState(data);
+
+          // Render with animations
+          await renderGuess(data, false);
+        } catch (error) {
+          showToast("Failed to submit guess: " + error.message);
+          console.warn(error.message);
+        } finally {
+          input.disabled = false;
+          input.focus();
+        }
+      });
+
+      async function renderGuess(guessData, isReplay = false) {
+        const {
+          name: name_res,
+          world: world_res,
+          book: book_res,
+          species: species_res,
+          abilities: abilities_res,
+          character,
+        } = guessData;
+
+        const row = document.createElement("div");
+        row.className = "guess-grid";
+
+        var subspecies = character.nationality;
+        if (!subspecies) subspecies = character.nation;
+        if (!subspecies) subspecies = character.ethnicity;
+
+        var species = character.species;
+        if (!species) species = "Human";
+        if (subspecies) species = `${species} (${subspecies})`;
+
+        const cells = [
+          { value: character.name, status: name_res },
+          { value: character.world, status: world_res },
+          { value: character.introduced, status: book_res },
+          { value: species, status: species_res },
+          {
+            value: character.abilities.join(", ") || "Uninvested",
+            status: abilities_res,
+          },
+        ];
+
+        for (let i = 0; i < cells.length; i++) {
+          const cellData = cells[i];
+          const cell = document.createElement("div");
+
+          const colorClasses = colorMap[cellData.status] || "bg-gray-700";
+
+          if (isReplay) {
+            cell.className = `cell ${colorClasses} no-animate`;
+          } else {
+            cell.className = `cell ${colorClasses} flip-animate`;
+            cell.style.animationDelay = `${i * 0.15}s`;
+          }
+
+          cell.innerHTML = `<span class="drop-shadow-md text-sm md:text-base">${cellData.value}</span>`;
+          row.appendChild(cell);
         }
 
+        // Prepend the new guess to the top of the container
+        container.insertBefore(row, container.firstChild);
+
+        if (!isReplay) {
+          // Wait for animations to finish before allowing rapid fire guesses
+          await delay(cells.length * 150 + 600);
+        }
+      }
+
+      let currentAuthMode = "login";
+      let currentLoggedInUser = "";
+
+      async function updateAuthUI(username = undefined, check = true) {
+        let loggedIn = true;
+        if (!username) {
+          if (check) {
+            let response = await fetch("/me");
+            if (response.ok) {
+              currentLoggedInUser = await response.text();
+            } else {
+              loggedIn = false;
+            }
+          } else {
+            loggedIn = false;
+          }
+        } else {
+          currentLoggedInUser = username;
+        }
+        const authButtons = document.getElementById("auth-buttons");
+        const userInfo = document.getElementById("user-info");
+
+        if (loggedIn) {
+          authButtons.classList.add("hidden");
+          userInfo.classList.remove("hidden");
+          userInfo.classList.add("flex");
+          document.getElementById("user-email").innerText = "Authenticated";
+        } else {
+          authButtons.classList.remove("hidden");
+          userInfo.classList.add("hidden");
+          userInfo.classList.remove("flex");
+        }
+      }
+
+      document
+        .getElementById("logout-btn")
+        .addEventListener("click", async () => {
+          let response = await fetch("/logout", {
+            method: "POST",
+          });
+          if (response.ok) {
+            await updateAuthUI(undefined, false);
+            showToast("Logged out successfully", false);
+          } else {
+            showToast(`Failed to log out: ${response.status}`);
+          }
+        });
+
+      document
+        .getElementById("auth-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const username = document.getElementById("auth-username").value;
+          const password = document.getElementById("auth-password").value;
+          const endpoint = currentAuthMode === "login" ? "/login" : "/signup";
+
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ username, password }),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Authentication failed (${response.status})`);
+            }
+
+            const response_user = await response.text();
+
+            closeAuthModal();
+            await updateAuthUI(response_user, false);
+            showToast(
+              `${currentAuthMode === "login" ? "Logged in" : "Signed up"} successfully!`,
+              false,
+            );
+          } catch (error) {
+            console.error(error);
+            showToast(error.message);
+          }
+        });
+
+      window.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closeAuthModal();
+        }
+      });
+
+      // Initialize UI state on load
+      updateAuthUI().then(
+        () => {},
+        (e) => console.error(e),
+      );
     </script>
-</body>
+  </body>
 </html>

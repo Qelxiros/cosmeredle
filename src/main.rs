@@ -1,20 +1,27 @@
-use std::{pin::Pin, time::Duration};
+use std::pin::Pin;
 
 use axum::{
     Router,
     routing::{get, post},
 };
+use axum_login::{
+    AuthManagerLayerBuilder,
+    tower_sessions::{ExpiredDeletion, Expiry},
+};
 use cosmeredle::{
     Result,
-    backend::{handle_guess, handle_list, home},
+    backend::Backend,
     cache::update_cache,
-    init,
+    db, err, init,
+    server::{handle_guess, handle_list, handle_login, handle_logout, handle_signup, home, me},
 };
 use futures::FutureExt;
-use std::sync::mpsc::channel;
-use tokio::task::spawn_blocking;
+use time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tower_http::{compression::CompressionLayer, limit::RequestBodyLimitLayer};
+use tower_http::{compression::CompressionLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
+use tower_sessions::{SessionManagerLayer, cookie::Key};
+use tower_sessions_sqlx_store::SqliteStore;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,16 +29,17 @@ async fn main() -> Result<()> {
 }
 
 async fn start() -> Result<()> {
-    init().await?;
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-    let (send, recv) = channel();
-    ctrlc::set_handler(move || send.clone().send(()).unwrap()).unwrap();
+    init().await?;
 
     let sched = JobScheduler::new().await?;
 
     sched
         .add(Job::new_one_shot_async(
-            Duration::default(),
+            std::time::Duration::default(),
             *Box::pin(update_cache_cron),
         )?)
         .await?;
@@ -41,18 +49,41 @@ async fn start() -> Result<()> {
 
     sched.start().await?;
 
+    let session_store = SqliteStore::new(db::conn().clone());
+    session_store.migrate().await?;
+
+    let deletion_task = tokio::task::spawn(
+        session_store
+            .clone()
+            .continuously_delete_expired(tokio::time::Duration::from_secs(60)),
+    );
+
+    let key = Key::try_generate().ok_or(err!("Failed to generate signing key for sessions"))?;
+
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_expiry(Expiry::OnInactivity(Duration::days(1)))
+        .with_signed(key);
+
+    let backend = Backend;
+    let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
+
     let app = Router::<()>::new()
-        .layer(CompressionLayer::new())
-        .layer(RequestBodyLimitLayer::new(1024))
         .route("/guess", post(handle_guess))
         .route("/list", get(handle_list))
-        .route("/", get(home));
+        .route("/signup", post(handle_signup))
+        .route("/login", post(handle_login))
+        .route("/logout", post(handle_logout))
+        .route("/me", get(me))
+        .route("/", get(home))
+        .layer(CompressionLayer::new())
+        .layer(RequestBodyLimitLayer::new(1024))
+        .layer(TraceLayer::new_for_http())
+        .layer(auth_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app)
-        .with_graceful_shutdown(spawn_blocking(move || recv.recv().unwrap()).map(|_| ()))
-        .await
-        .unwrap();
+    axum::serve(listener, app).await.unwrap();
+
+    deletion_task.await??;
 
     Ok(())
 }

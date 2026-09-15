@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS user (
+  username TEXT NOT NULL PRIMARY KEY,
+  bcrypt TEXT NOT NULL
+);
