@@ -10,6 +10,7 @@ use bcrypt::hash;
 use derive_debug::Dbg;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tokio::task;
 
 use crate::{Character, Result, answer::today, backend::AuthSession, cache::CACHE, db, err};
 
@@ -94,7 +95,20 @@ pub struct GuessResponse {
     character: CharacterWire,
 }
 
-pub async fn handle_guess(Json(guess): Json<String>) -> Result<Json<GuessResponse>> {
+pub async fn handle_guess(
+    auth_session: AuthSession,
+    Json(guess): Json<String>,
+) -> Result<Json<GuessResponse>> {
+    let db_job = if let Some(user) = auth_session.user {
+        if user.guesses.0.contains(&guess) {
+            return Err(user_err!("Already guessed!"));
+        }
+        let g = guess.clone();
+        Some(task::spawn(db::insert_guess(user.id, g)))
+    } else {
+        None
+    };
+
     let cache = CACHE.read().await;
 
     let guess = cache
@@ -153,6 +167,10 @@ pub async fn handle_guess(Json(guess): Json<String>) -> Result<Json<GuessRespons
         character: guess.clone().into(),
     };
 
+    if let Some(job) = db_job {
+        job.await??
+    }
+
     Ok(Json(out))
 }
 
@@ -183,13 +201,7 @@ pub async fn handle_signup(auth_session: AuthSession, Json(auth): Json<Auth>) ->
         Ok(b) => b,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    if db::insert_user(db::User {
-        username: a.username,
-        bcrypt,
-    })
-    .await
-    .is_err()
-    {
+    if db::insert_user(a.username, bcrypt).await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 

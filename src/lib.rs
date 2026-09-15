@@ -1,4 +1,4 @@
-use std::{io, result, str::Utf8Error};
+use std::{fmt, io, result, str::Utf8Error};
 
 use axum::{http::StatusCode, response::IntoResponse};
 use axum_login::tower_sessions::session_store;
@@ -18,30 +18,32 @@ pub mod wiki;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Password encryption/decryption error: `{0}`")]
+    #[error("Password encryption/decryption error: {0}")]
     Bcrypt(#[from] BcryptError),
-    #[error("Deserialization error: `{0}`")]
+    #[error("Deserialization error: {0}")]
     CborDe(#[from] ciborium::de::Error<io::Error>),
-    #[error("Serialization error: `{0}`")]
+    #[error("Serialization error: {0}")]
     CborSer(#[from] ciborium::ser::Error<io::Error>),
-    #[error("I/O error: `{0}`")]
+    #[error("Formatting error: {0}")]
+    Format(#[from] fmt::Error),
+    #[error("I/O error: {0}")]
     Io(#[from] io::Error),
-    #[error("Tokio join error: `{0}`")]
+    #[error("Tokio join error: {0}")]
     Join(#[from] JoinError),
-    #[error("Coppermind error: `{0}`")]
+    #[error("Coppermind error: {0}")]
     MediaWiki(#[from] MediaWikiError),
-    #[error("Scheduler error: `{0}`")]
+    #[error("Scheduler error: {0}")]
     Sched(#[from] JobSchedulerError),
-    #[error("Error storing sessions: `{0}`")]
+    #[error("Error storing sessions: {0}")]
     SessionStore(#[from] session_store::Error),
-    #[error("Database error: `{0}`")]
+    #[error("Database error: {0}")]
     Sql(#[from] sqlx::Error),
     #[error("Invalid UTF-8 encountered")]
     Utf8(#[from] Utf8Error),
 
-    #[error("`{0}`")]
+    #[error("{0}")]
     String(String),
-    #[error("`{0}`")]
+    #[error("{0}")]
     User(String),
 }
 
@@ -51,6 +53,7 @@ impl IntoResponse for Error {
             Self::Bcrypt(_)
             | Self::CborDe(_)
             | Self::CborSer(_)
+            | Self::Format(_)
             | Self::Io(_)
             | Self::Join(_)
             | Self::MediaWiki(_)

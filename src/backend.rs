@@ -12,10 +12,10 @@ use crate::{
 pub struct Backend;
 
 impl AuthUser for db::User {
-    type Id = String;
+    type Id = i64;
 
     fn id(&self) -> Self::Id {
-        self.username.clone()
+        self.id
     }
 
     fn session_auth_hash(&self) -> &[u8] {
@@ -32,7 +32,7 @@ impl AuthnBackend for Backend {
         &self,
         creds: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
-        let user = db::get_user(&creds.username).await?;
+        let user = db::get_user_by_username(&creds.username).await?;
 
         task::spawn_blocking(|| {
             Ok(user.filter(|user| verify(creds.password, &user.bcrypt).is_ok_and(|b| b)))
@@ -41,7 +41,7 @@ impl AuthnBackend for Backend {
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        db::get_user(user_id).await
+        db::get_user(*user_id).await
     }
 }
 
