@@ -7,12 +7,17 @@ use axum::{
     response::{Html, IntoResponse},
 };
 use bcrypt::hash;
+use chrono::Local;
 use derive_debug::Dbg;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tokio::task;
 
-use crate::{Character, Result, answer::today, backend::AuthSession, cache::CACHE, db, err};
+use crate::{
+    Character, Error, Result,
+    answer::today,
+    backend::AuthSession,
+    db::{self, all_characters, get_character},
+};
 
 pub fn init() -> Result<()> {
     Ok(())
@@ -26,6 +31,15 @@ macro_rules! user_err {
 
 pub async fn home() -> Result<Html<String>> {
     Ok(Html(read_to_string("src/index.html")?))
+}
+
+pub async fn day() -> Result<String> {
+    let mut s = String::new();
+    Local::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .write_to(&mut s)?;
+    Ok(s)
 }
 
 pub async fn me(auth_session: AuthSession) -> impl IntoResponse {
@@ -80,7 +94,7 @@ impl From<Character> for CharacterWire {
             nationality: value.nationality,
             nation: value.nation,
             ethnicity: value.ethnicity,
-            abilities: value.abilities,
+            abilities: value.abilities.0,
         }
     }
 }
@@ -109,15 +123,9 @@ pub async fn handle_guess(
         None
     };
 
-    let cache = CACHE.read().await;
+    let guess = get_character(&guess).await?;
 
-    let guess = cache
-        .get(&guess)
-        .ok_or(user_err!("unrecognized character"))?;
-
-    let answer = cache
-        .get(&today().await)
-        .ok_or(err!("Missing answer details"))?;
+    let answer = get_character(&today().await?).await?;
 
     let out = GuessResponse {
         name: if guess.name == answer.name {
@@ -174,18 +182,8 @@ pub async fn handle_guess(
     Ok(Json(out))
 }
 
-pub async fn handle_list() -> Json<Vec<String>> {
-    Json(
-        CACHE
-            .read()
-            .await
-            .iter()
-            .filter(|(_, v)| v.universe == "Cosmere")
-            .map(|(k, _)| k)
-            .cloned()
-            .sorted_unstable()
-            .collect_vec(),
-    )
+pub async fn handle_list() -> Result<Json<Vec<String>>> {
+    Ok(Json(all_characters().await?))
 }
 
 #[derive(Dbg, Clone, Serialize, Deserialize)]
@@ -201,8 +199,10 @@ pub async fn handle_signup(auth_session: AuthSession, Json(auth): Json<Auth>) ->
         Ok(b) => b,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    if db::insert_user(a.username, bcrypt).await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match db::insert_user(a.username, bcrypt).await {
+        Err(Error::Sql(sqlx::Error::Database(_))) => return StatusCode::CONFLICT.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(()) => {}
     }
 
     handle_login(auth_session, Json(auth)).await

@@ -92,6 +92,30 @@ function post(path, body) {
   });
 }
 
+/** The shape `/day` promises: `%Y-%m-%d`, per `server::day`. */
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The puzzle day the server is currently serving an answer for.
+ *
+ * This is authoritative. The browser cannot derive it: the server rolls the
+ * answer over on `Local::now()` (src/answer.rs), which is whatever timezone
+ * the deployment happens to run in, not the player's and not a fixed zone.
+ *
+ * Returned as a bare `String`, so text/plain rather than JSON.
+ * @returns {Promise<string>} YYYY-MM-DD.
+ */
+export async function fetchPuzzleDay() {
+  const response = await request("/day");
+  const day = (await response.text()).trim();
+
+  if (!DAY_PATTERN.test(day)) {
+    throw new ApiError("The server reported an unreadable puzzle day.");
+  }
+
+  return day;
+}
+
 /**
  * Guessable character names, sorted by the server.
  * @returns {Promise<string[]>}

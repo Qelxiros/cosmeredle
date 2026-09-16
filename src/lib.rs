@@ -5,13 +5,13 @@ use axum_login::tower_sessions::session_store;
 use bcrypt::BcryptError;
 use mediawiki::MediaWikiError;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio_cron_scheduler::JobSchedulerError;
 
 pub mod answer;
 pub mod backend;
-pub mod cache;
 pub mod db;
 pub mod server;
 pub mod wiki;
@@ -96,7 +96,7 @@ pub struct Character {
     descendants: String,
     born: String,
     died: String,
-    abilities: Vec<String>,
+    abilities: Json<Vec<String>>,
     bonded: String,
     titles: String,
     aliases: String,
@@ -173,7 +173,7 @@ impl Character {
     }
 
     pub fn abilities(&mut self, v: Vec<String>) {
-        self.abilities = v;
+        self.abilities = Json(v);
     }
 
     pub fn name(&mut self, v: String) {

@@ -11,14 +11,19 @@ use axum_login::{
 use cosmeredle::{
     Result,
     backend::Backend,
-    cache::update_cache,
     db, err, init,
-    server::{handle_guess, handle_list, handle_login, handle_logout, handle_signup, home, me},
+    server::{
+        day, handle_guess, handle_list, handle_login, handle_logout, handle_signup, home, me,
+    },
+    wiki::sync_characters,
 };
 use futures::FutureExt;
 use time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tower_http::{compression::CompressionLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
+use tower_http::{
+    compression::CompressionLayer, limit::RequestBodyLimitLayer, services::ServeDir,
+    trace::TraceLayer,
+};
 use tower_sessions::{SessionManagerLayer, cookie::Key};
 use tower_sessions_sqlx_store::SqliteStore;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -73,8 +78,10 @@ async fn start() -> Result<()> {
         .route("/signup", post(handle_signup))
         .route("/login", post(handle_login))
         .route("/logout", post(handle_logout))
+        .route("/day", get(day))
         .route("/me", get(me))
         .route("/", get(home))
+        .nest_service("/static", ServeDir::new("src/static"))
         .layer(CompressionLayer::new())
         .layer(RequestBodyLimitLayer::new(1024))
         .layer(TraceLayer::new_for_http())
@@ -89,5 +96,5 @@ async fn start() -> Result<()> {
 }
 
 fn update_cache_cron(_: uuid::Uuid, _: JobScheduler) -> Pin<Box<dyn Future<Output = ()> + Send>> {
-    Box::pin(update_cache().map(|_| ()))
+    Box::pin(sync_characters().map(|_| ()))
 }

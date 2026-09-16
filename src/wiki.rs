@@ -3,6 +3,7 @@ use std::{
     sync::{LazyLock, OnceLock},
 };
 
+use itertools::Itertools;
 use mediawiki::{
     Api,
     action_api::{
@@ -15,7 +16,7 @@ use serde_json::Value;
 
 use crate::{
     Character, Result,
-    cache::{CACHE, store_cache},
+    db::{character_present, deactivate_characters, insert_character},
     err,
 };
 
@@ -161,18 +162,19 @@ pub async fn get_character(name: &str) -> Result<Character> {
     Ok(out)
 }
 
-pub async fn sync_characters(names: HashSet<String>) -> Result<()> {
+pub async fn sync_characters() -> Result<()> {
+    let names = get_character_pages().await?.into_iter().collect_vec();
+    deactivate_characters(&names).await?;
     for name in names {
-        if CACHE.read().await.contains_key(&name) {
+        if character_present(&name).await {
             continue;
         }
 
         let character = get_character(&name).await;
         if let Ok(ch) = character {
-            CACHE.write().await.insert(name, ch);
-            let _ = store_cache().await;
+            insert_character(&ch).await?;
         }
     }
 
-    store_cache().await
+    Ok(())
 }

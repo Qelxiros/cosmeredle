@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS character (
+  name TEXT NOT NULL PRIMARY KEY,
+  unnamed BOOL NOT NULL,
+  parents TEXT NOT NULL,
+  spouse TEXT NOT NULL,
+  siblings TEXT NOT NULL,
+  children TEXT NOT NULL,
+  ancestors TEXT NOT NULL,
+  relatives TEXT NOT NULL,
+  descendants TEXT NOT NULL,
+  born TEXT NOT NULL,
+  died TEXT NOT NULL,
+  bonded TEXT NOT NULL,
+  titles TEXT NOT NULL,
+  aliases TEXT NOT NULL,
+  skills TEXT NOT NULL,
+  achievements TEXT NOT NULL,
+  powers TEXT NOT NULL,
+  hash_profession TEXT NOT NULL,
+  profession TEXT NOT NULL,
+  occupation TEXT NOT NULL,
+  religion TEXT NOT NULL,
+  groups TEXT NOT NULL,
+  species TEXT NOT NULL,
+  tick_species TEXT NOT NULL,
+  era TEXT NOT NULL,
+  birthplace TEXT NOT NULL,
+  tick_birthplace TEXT NOT NULL,
+  residence TEXT NOT NULL,
+  tick_residence TEXT NOT NULL,
+  ethnicity TEXT NOT NULL,
+  tick_ethnicity TEXT NOT NULL,
+  nation TEXT NOT NULL,
+  tick_nation TEXT NOT NULL,
+  nationality TEXT NOT NULL,
+  world TEXT NOT NULL,
+  tick_world TEXT NOT NULL,
+  hide_world BOOL NOT NULL,
+  universe TEXT NOT NULL,
+  introduced TEXT NOT NULL,
+  active BOOL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ability (
+  character TEXT NOT NULL,
+  ability TEXT NOT NULL,
+  FOREIGN KEY (character) REFERENCES character(name)
+
+  PRIMARY KEY (character, ability)
+);

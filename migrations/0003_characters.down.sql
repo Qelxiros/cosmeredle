@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS ability;
+DROP TABLE IF EXISTS character;

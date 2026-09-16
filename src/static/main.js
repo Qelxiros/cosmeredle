@@ -2,11 +2,11 @@
  * Entry point: wires the modules together and owns the game's session state.
  */
 
-import { ApiError, fetchCharacterNames, submitGuess } from "./api.js";
+import { ApiError, fetchCharacterNames, fetchPuzzleDay, submitGuess } from "./api.js";
 import { createAuth } from "./auth.js";
 import { createAutocomplete } from "./autocomplete.js";
 import { renderGuess, renderHeadings, renderHistory, renderLegend, rowAnimationMs } from "./board.js";
-import { loadState, pruneOldState, saveState } from "./storage.js";
+import { createStorage } from "./storage.js";
 import { initToasts, showToast } from "./toast.js";
 
 /**
@@ -54,7 +54,12 @@ const auth = createAuth({
 let characterNames = [];
 let busy = false;
 
-const state = loadState();
+// Both stay undefined until `/day` answers and `restoreBoard` can bind
+// persistence to a real puzzle day; the handlers below check before reading.
+/** @type {ReturnType<typeof createStorage>|undefined} */
+let store;
+/** @type {{version: number, guesses: object[], solved: boolean}|undefined} */
+let state;
 
 const autocomplete = createAutocomplete({
   input: el.guessInput,
@@ -97,7 +102,7 @@ function renderSolvedState() {
 
 async function onSubmit(event) {
   event.preventDefault();
-  if (busy || state.solved) return;
+  if (state === undefined || busy || state.solved) return;
 
   const typed = el.guessInput.value.trim();
   if (typed === "") return;
@@ -119,7 +124,7 @@ async function onSubmit(event) {
 
     state.guesses.push(result);
     if (result.name === "Correct") state.solved = true;
-    saveState(state);
+    store.save(state);
 
     renderGuess(el.board, result, true);
     await new Promise((resolve) => window.setTimeout(resolve, rowAnimationMs));
@@ -143,7 +148,7 @@ async function onSubmit(event) {
  */
 function onGlobalKeydown(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
-  if (auth.isOpen() || state.solved) return;
+  if (state === undefined || auth.isOpen() || state.solved) return;
   if (!/^[a-zA-Z]$/.test(event.key)) return;
 
   const active = document.activeElement;
@@ -165,16 +170,58 @@ async function loadCharacters() {
   }
 }
 
+/**
+ * Opens persistence against the server's puzzle day and puts that day's board
+ * back on screen.
+ *
+ * The day has to come off the wire — only the server knows which puzzle it is
+ * currently answering — so the board cannot be restored until `/day` returns.
+ * Until then the guess controls stay disabled: submitting into an unknown day
+ * would file the result under the wrong key.
+ */
+async function restoreBoard() {
+  /** @type {string|null} */
+  let day = null;
+
+  try {
+    day = await fetchPuzzleDay();
+  } catch (error) {
+    showToast(
+      error instanceof ApiError
+        ? `Could not confirm today's puzzle: ${error.message}`
+        : "Could not confirm today's puzzle.",
+    );
+  }
+
+  store = createStorage(day);
+  state = store.load();
+  store.prune();
+
+  renderHistory(el.board, state.guesses);
+
+  if (state.solved) {
+    renderSolvedState();
+  } else {
+    el.guessInput.disabled = false;
+    el.guessSubmit.disabled = false;
+    el.guessInput.focus();
+  }
+}
+
 function init() {
-  pruneOldState();
   renderHeadings(el.boardHead);
   renderLegend(el.legendItems);
-  renderHistory(el.board, state.guesses);
-  renderSolvedState();
+
+  // Held until `restoreBoard` has a day to file guesses under. The listeners
+  // go on now rather than afterwards so that a submit arriving during the
+  // round trip is swallowed here instead of navigating the page.
+  el.guessInput.disabled = true;
+  el.guessSubmit.disabled = true;
 
   el.guessForm.addEventListener("submit", onSubmit);
   document.addEventListener("keydown", onGlobalKeydown);
 
+  restoreBoard();
   loadCharacters();
   auth.refresh();
 }
