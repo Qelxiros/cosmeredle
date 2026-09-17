@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, username, bcrypt, json_group_array(guess) FILTER (WHERE guess IS NOT NULL) AS \"guesses!: Json<Vec<String>>\" FROM user LEFT JOIN guess ON user.id = guess.user_id WHERE id = $1 GROUP BY id, username, bcrypt",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "username",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "bcrypt",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "guesses!: Json<Vec<String>>",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "a50760b51d01d8e7744072e7634b0f5ccd1eb109fad04a46cff4ed00a9f948ba"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO guess (user_id, guess, day) VALUES ($1, $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4d7f669ec2476b4e59e59e607f92e1da66abfcad6ecbcbce4c336a0ae1143cfb"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM answer",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "114df68349bcbf9010cdd74fbc0210c2163f300b479b825dc63ed76b93f3e132"
+}

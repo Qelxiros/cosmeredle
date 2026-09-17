@@ -12,15 +12,12 @@ FROM rust:1.97.1-bookworm AS builder
 WORKDIR /app
 
 # sqlx's query!/query_as! macros are type-checked against a real schema at
-# compile time, so the build needs a database with the migrations applied. This
-# one is a build artefact: it never leaves this stage, and the running container
-# migrates its own (migrate!() in db::init). Applying the SQL with the sqlite3
-# CLI keeps the slow `cargo install sqlx-cli` layer out of the build entirely.
-ENV DATABASE_URL=sqlite:///tmp/build.db
-
-RUN apt-get update \
-    && apt-get install --no-install-recommends --yes sqlite3 \
-    && rm -rf /var/lib/apt/lists/*
+# compile time. `.sqlx/` carries that schema information with the source: it is
+# recorded by `cargo sqlx prepare` against a migrated database and checked in,
+# so the build needs no database of its own, no sqlite3 and no `cargo install
+# sqlx-cli`. Rerun that command whenever a query or a migration changes, or the
+# build stops with "no cached data for this query".
+ENV SQLX_OFFLINE=true
 
 # Dependencies are built against the manifest alone, so editing src/ does not
 # invalidate the layer that compiles the whole tree of crates.
@@ -31,11 +28,10 @@ RUN mkdir src \
     && cargo build --release \
     && rm -r src
 
+COPY .sqlx .sqlx
 COPY migrations migrations
 COPY tags .
 COPY src src
-
-RUN cat migrations/*.up.sql | sqlite3 /tmp/build.db
 
 # COPY preserves source mtimes, which are older than the dependency build above,
 # and cargo's fingerprints are mtime-based: without this it would consider the

@@ -1,0 +1,254 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n        character.name AS \"name!\",\n        character.unnamed AS \"unnamed!: bool\",\n        character.parents AS \"parents!\",\n        character.spouse AS \"spouse!\",\n        character.siblings AS \"siblings!\",\n        character.children AS \"children!\",\n        character.ancestors AS \"ancestors!\",\n        character.relatives AS \"relatives!\",\n        character.descendants AS \"descendants!\",\n        character.born AS \"born!\",\n        character.died AS \"died!\",\n        json_group_array(ability) FILTER (WHERE ability IS NOT NULL) AS \"abilities!: Json<Vec<String>>\",\n        character.bonded AS \"bonded!\",\n        character.titles AS \"titles!\",\n        character.aliases AS \"aliases!\",\n        character.skills AS \"skills!\",\n        character.achievements AS \"achievements!\",\n        character.powers AS \"powers!\",\n        character.hash_profession AS \"hash_profession!\",\n        character.profession AS \"profession!\",\n        character.occupation AS \"occupation!\",\n        character.religion AS \"religion!\",\n        character.groups AS \"groups!\",\n        character.species AS \"species!\",\n        character.tick_species AS \"tick_species!\",\n        character.era AS \"era!\",\n        character.birthplace AS \"birthplace!\",\n        character.tick_birthplace AS \"tick_birthplace!\",\n        character.residence AS \"residence!\",\n        character.tick_residence AS \"tick_residence!\",\n        character.ethnicity AS \"ethnicity!\",\n        character.tick_ethnicity AS \"tick_ethnicity!\",\n        character.nation AS \"nation!\",\n        character.tick_nation AS \"tick_nation!\",\n        character.nationality AS \"nationality!\",\n        character.world AS \"world!\",\n        character.tick_world AS \"tick_world!\",\n        character.hide_world AS \"hide_world!: bool\",\n        character.universe AS \"universe!\",\n        character.introduced AS \"introduced!\"\n        FROM character\n        LEFT JOIN ability ON character.name = ability.character\n        WHERE character.name = $1\n        GROUP BY character.name",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "unnamed!: bool",
+        "ordinal": 1,
+        "type_info": "Bool"
+      },
+      {
+        "name": "parents!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "spouse!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "siblings!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "children!",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "ancestors!",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "relatives!",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "descendants!",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "born!",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "died!",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "abilities!: Json<Vec<String>>",
+        "ordinal": 11,
+        "type_info": "Null"
+      },
+      {
+        "name": "bonded!",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "titles!",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "aliases!",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "skills!",
+        "ordinal": 15,
+        "type_info": "Text"
+      },
+      {
+        "name": "achievements!",
+        "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "powers!",
+        "ordinal": 17,
+        "type_info": "Text"
+      },
+      {
+        "name": "hash_profession!",
+        "ordinal": 18,
+        "type_info": "Text"
+      },
+      {
+        "name": "profession!",
+        "ordinal": 19,
+        "type_info": "Text"
+      },
+      {
+        "name": "occupation!",
+        "ordinal": 20,
+        "type_info": "Text"
+      },
+      {
+        "name": "religion!",
+        "ordinal": 21,
+        "type_info": "Text"
+      },
+      {
+        "name": "groups!",
+        "ordinal": 22,
+        "type_info": "Text"
+      },
+      {
+        "name": "species!",
+        "ordinal": 23,
+        "type_info": "Text"
+      },
+      {
+        "name": "tick_species!",
+        "ordinal": 24,
+        "type_info": "Text"
+      },
+      {
+        "name": "era!",
+        "ordinal": 25,
+        "type_info": "Text"
+      },
+      {
+        "name": "birthplace!",
+        "ordinal": 26,
+        "type_info": "Text"
+      },
+      {
+        "name": "tick_birthplace!",
+        "ordinal": 27,
+        "type_info": "Text"
+      },
+      {
+        "name": "residence!",
+        "ordinal": 28,
+        "type_info": "Text"
+      },
+      {
+        "name": "tick_residence!",
+        "ordinal": 29,
+        "type_info": "Text"
+      },
+      {
+        "name": "ethnicity!",
+        "ordinal": 30,
+        "type_info": "Text"
+      },
+      {
+        "name": "tick_ethnicity!",
+        "ordinal": 31,
+        "type_info": "Text"
+      },
+      {
+        "name": "nation!",
+        "ordinal": 32,
+        "type_info": "Text"
+      },
+      {
+        "name": "tick_nation!",
+        "ordinal": 33,
+        "type_info": "Text"
+      },
+      {
+        "name": "nationality!",
+        "ordinal": 34,
+        "type_info": "Text"
+      },
+      {
+        "name": "world!",
+        "ordinal": 35,
+        "type_info": "Text"
+      },
+      {
+        "name": "tick_world!",
+        "ordinal": 36,
+        "type_info": "Text"
+      },
+      {
+        "name": "hide_world!: bool",
+        "ordinal": 37,
+        "type_info": "Bool"
+      },
+      {
+        "name": "universe!",
+        "ordinal": 38,
+        "type_info": "Text"
+      },
+      {
+        "name": "introduced!",
+        "ordinal": 39,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "27cc0060634399852ba13c18a8876a2afc6ead6daadcd9d9c455da20f47e40e5"
+}

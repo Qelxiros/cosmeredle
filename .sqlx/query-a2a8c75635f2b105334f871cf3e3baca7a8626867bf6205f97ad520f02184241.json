@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT answer, date FROM answer LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "answer",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a2a8c75635f2b105334f871cf3e3baca7a8626867bf6205f97ad520f02184241"
+}

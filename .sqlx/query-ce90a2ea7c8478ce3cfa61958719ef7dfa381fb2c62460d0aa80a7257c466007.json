@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT guess FROM guess WHERE user_id = $1 AND day = $2",
+  "describe": {
+    "columns": [
+      {
+        "name": "guess",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ce90a2ea7c8478ce3cfa61958719ef7dfa381fb2c62460d0aa80a7257c466007"
+}

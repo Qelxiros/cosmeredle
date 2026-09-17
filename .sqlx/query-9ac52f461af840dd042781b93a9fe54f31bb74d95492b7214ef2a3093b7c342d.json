@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE user SET bcrypt = $2 WHERE username = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "9ac52f461af840dd042781b93a9fe54f31bb74d95492b7214ef2a3093b7c342d"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO ability (character, ability) SELECT $1, value FROM json_each($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "23b304f086b01a78fc9a816edb9474aaa5d5f4c2ccab93a783b6fbc1f2cb71d8"
+}
