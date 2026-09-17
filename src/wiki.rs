@@ -181,7 +181,7 @@ pub async fn get_book(name: &str) -> Result<Book> {
     })
 }
 
-pub async fn sync_characters() -> Result<()> {
+async fn sync_characters() -> Result<()> {
     let names = get_template_pages(CHARACTER_TEMPLATE)
         .await?
         .into_iter()
@@ -204,7 +204,7 @@ pub async fn sync_characters() -> Result<()> {
     Ok(())
 }
 
-pub async fn sync_books() -> Result<()> {
+async fn sync_books() -> Result<()> {
     let titles = get_template_pages(BOOK_TEMPLATE)
         .await?
         .into_iter()
@@ -219,6 +219,13 @@ pub async fn sync_books() -> Result<()> {
             insert_book(&b).await?;
         }
     }
+
+    Ok(())
+}
+
+pub async fn sync() -> Result<()> {
+    sync_characters().await?;
+    sync_books().await?;
 
     Ok(())
 }

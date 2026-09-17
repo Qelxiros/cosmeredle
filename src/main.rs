@@ -17,7 +17,7 @@ use cosmeredle::{
         day, handle_change_password, handle_guess, handle_list, handle_login, handle_logout,
         handle_signup, home, me,
     },
-    wiki::sync_characters,
+    wiki::sync,
 };
 use futures::FutureExt;
 use time::Duration;
@@ -115,5 +115,5 @@ async fn start() -> Result<()> {
 }
 
 fn update_cache_cron(_: uuid::Uuid, _: JobScheduler) -> Pin<Box<dyn Future<Output = ()> + Send>> {
-    Box::pin(sync_characters().map(|_| ()))
+    Box::pin(sync().map(|_| ()))
 }
