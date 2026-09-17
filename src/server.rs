@@ -13,15 +13,17 @@ use serde::{Deserialize, Serialize};
 use tokio::task;
 
 use crate::{
-    Character, Error, Result,
+    Character, Result,
     answer::today,
     backend::AuthSession,
-    db::{self, all_characters, get_character},
+    db::{self, DATE_FORMAT, all_characters, get_book, get_character, get_guesses},
+    err,
 };
 
-pub fn init() -> Result<()> {
-    Ok(())
-}
+/// The page served at `/`, relative to the working directory.
+pub const INDEX_PATH: &str = "src/index.html";
+/// bcrypt work factor used when hashing a new account's password.
+pub const BCRYPT_COST: u32 = 12;
 
 macro_rules! user_err {
     ($s:literal $(,$args:expr)*) => {
@@ -29,42 +31,56 @@ macro_rules! user_err {
     };
 }
 
+pub fn init() -> Result<()> {
+    Ok(())
+}
+
 pub async fn home() -> Result<Html<String>> {
-    Ok(Html(read_to_string("src/index.html")?))
+    Ok(Html(read_to_string(INDEX_PATH)?))
 }
 
 pub async fn day() -> Result<String> {
     let mut s = String::new();
     Local::now()
         .date_naive()
-        .format("%Y-%m-%d")
+        .format(DATE_FORMAT)
         .write_to(&mut s)?;
     Ok(s)
 }
 
-pub async fn me(auth_session: AuthSession) -> impl IntoResponse {
-    match auth_session.user {
-        Some(user) => (StatusCode::OK, Json(user.username)).into_response(),
-        None => StatusCode::UNAUTHORIZED.into_response(),
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct User {
+    pub username: String,
+    pub guesses: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum BinaryStatus {
+pub async fn me(auth_session: AuthSession) -> Result<Json<User>> {
+    let user = auth_session
+        .user
+        .ok_or(err!("reached /me handler without logging in"))?;
+
+    Ok(Json(User {
+        username: user.username,
+        guesses: get_guesses(user.id).await?,
+    }))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BinaryStatus {
     Correct,
     Incorrect,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum TernaryStatus {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TernaryStatus {
     Correct,
     Adjacent,
     Incorrect,
 }
 
 // "the answer is a ... of your guess"
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum SetStatus {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SetStatus {
     Equal,
     Overlap,
     Subset,
@@ -72,16 +88,16 @@ enum SetStatus {
     Disjoint,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct CharacterWire {
-    name: String,
-    world: String,
-    introduced: String,
-    species: String,
-    nationality: String,
-    nation: String,
-    ethnicity: String,
-    abilities: Vec<String>,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CharacterWire {
+    pub name: String,
+    pub world: String,
+    pub introduced: String,
+    pub species: String,
+    pub nationality: String,
+    pub nation: String,
+    pub ethnicity: String,
+    pub abilities: Vec<String>,
 }
 
 impl From<Character> for CharacterWire {
@@ -101,31 +117,29 @@ impl From<Character> for CharacterWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuessResponse {
-    name: BinaryStatus,
-    world: BinaryStatus,
-    book: TernaryStatus,
-    species: TernaryStatus,
-    abilities: SetStatus,
-    character: CharacterWire,
+    pub name: BinaryStatus,
+    pub world: BinaryStatus,
+    pub book: TernaryStatus,
+    pub species: TernaryStatus,
+    pub abilities: SetStatus,
+    pub character: CharacterWire,
 }
 
 pub async fn handle_guess(
     auth_session: AuthSession,
-    Json(guess): Json<String>,
+    Json(guess_str): Json<String>,
 ) -> Result<Json<GuessResponse>> {
+    let guess = get_character(&guess_str)
+        .await
+        .map_err(|_| user_err!("Unknown character {guess_str}"))?;
+    let answer = get_character(&today().await?).await?;
+
     let db_job = if let Some(user) = auth_session.user {
-        if user.guesses.0.contains(&guess) {
-            return Err(user_err!("Already guessed!"));
-        }
-        let g = guess.clone();
+        let g = guess_str.clone();
         Some(task::spawn(db::insert_guess(user.id, g)))
     } else {
         None
     };
-
-    let guess = get_character(&guess).await?;
-
-    let answer = get_character(&today().await?).await?;
 
     let out = GuessResponse {
         name: if guess.name == answer.name {
@@ -141,7 +155,12 @@ pub async fn handle_guess(
         book: if guess.introduced == answer.introduced {
             TernaryStatus::Correct
         } else {
-            TernaryStatus::Incorrect
+            let abook = get_book(&answer.introduced).await?;
+            let gbook = get_book(&guess.introduced).await?;
+            match (abook.and_then(|a| a.series), gbook.and_then(|g| g.series)) {
+                (Some(a), Some(g)) if a == g => TernaryStatus::Adjacent,
+                _ => TernaryStatus::Incorrect,
+            }
         },
         species: if guess.species == answer.species {
             if guess.nation == answer.nation
@@ -176,7 +195,7 @@ pub async fn handle_guess(
     };
 
     if let Some(job) = db_job {
-        job.await??
+        let _: Result<()> = job.await?;
     }
 
     Ok(Json(out))
@@ -193,19 +212,22 @@ pub struct Auth {
     pub password: String,
 }
 
-pub async fn handle_signup(auth_session: AuthSession, Json(auth): Json<Auth>) -> impl IntoResponse {
-    let a = auth.clone();
-    let bcrypt = match hash(a.password, 12) {
-        Ok(b) => b,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
-    match db::insert_user(a.username, bcrypt).await {
-        Err(Error::Sql(sqlx::Error::Database(_))) => return StatusCode::CONFLICT.into_response(),
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        Ok(()) => {}
+pub async fn handle_signup(
+    auth_session: AuthSession,
+    Json(auth): Json<Auth>,
+) -> Result<Response<Body>> {
+    if auth.username.len() < 3 {
+        return Err(user_err!("Username too short"));
+    }
+    if auth.password.len() < 8 {
+        return Err(user_err!("Password too short"));
     }
 
-    handle_login(auth_session, Json(auth)).await
+    let a = auth.clone();
+    let bcrypt = task::spawn_blocking(|| hash(a.password, BCRYPT_COST)).await??;
+    db::insert_user(a.username, bcrypt).await?;
+
+    Ok(handle_login(auth_session, Json(auth)).await)
 }
 
 pub async fn handle_login(mut auth_session: AuthSession, Json(auth): Json<Auth>) -> Response<Body> {

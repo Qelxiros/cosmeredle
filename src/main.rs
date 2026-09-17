@@ -1,11 +1,12 @@
-use std::pin::Pin;
+use std::{net::SocketAddr, pin::Pin, sync::Arc};
 
 use axum::{
     Router,
+    http::Method,
     routing::{get, post},
 };
 use axum_login::{
-    AuthManagerLayerBuilder,
+    AuthManagerLayerBuilder, login_required,
     tower_sessions::{ExpiredDeletion, Expiry},
 };
 use cosmeredle::{
@@ -20,6 +21,9 @@ use cosmeredle::{
 use futures::FutureExt;
 use time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
+use tower_governor::{
+    GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
+};
 use tower_http::{
     compression::CompressionLayer, limit::RequestBodyLimitLayer, services::ServeDir,
     trace::TraceLayer,
@@ -45,7 +49,7 @@ async fn start() -> Result<()> {
     sched
         .add(Job::new_one_shot_async(
             std::time::Duration::default(),
-            *Box::pin(update_cache_cron),
+            update_cache_cron,
         )?)
         .await?;
     sched
@@ -72,20 +76,33 @@ async fn start() -> Result<()> {
     let backend = Backend;
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
+    let governor_config = Arc::new(
+        GovernorConfigBuilder::default()
+            .key_extractor(SmartIpKeyExtractor)
+            .per_second(4)
+            .burst_size(2)
+            .methods(vec![Method::POST])
+            .finish()
+            .unwrap(),
+    );
+
     let app = Router::<()>::new()
+        .route("/me", get(me))
+        .route("/logout", post(handle_logout))
+        .route_layer(login_required!(Backend))
         .route("/guess", post(handle_guess))
         .route("/list", get(handle_list))
         .route("/signup", post(handle_signup))
         .route("/login", post(handle_login))
-        .route("/logout", post(handle_logout))
         .route("/day", get(day))
-        .route("/me", get(me))
+        .layer(GovernorLayer::new(governor_config))
         .route("/", get(home))
+        .layer(auth_layer)
         .nest_service("/static", ServeDir::new("src/static"))
         .layer(CompressionLayer::new())
         .layer(RequestBodyLimitLayer::new(1024))
         .layer(TraceLayer::new_for_http())
-        .layer(auth_layer);
+        .into_make_service_with_connect_info::<SocketAddr>();
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();

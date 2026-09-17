@@ -148,11 +148,17 @@
         <p id="win-banner-detail" class="banner__detail"></p>
       </div>
 
-      <section class="board" aria-label="Your guesses">
-        <!-- Cells carry their own column name for assistive technology, so the
-             visible heading row would otherwise be read twice. -->
-        <div id="board-head" class="board__row board__head" aria-hidden="true"></div>
-        <div id="board"></div>
+      <section class="board">
+        <!-- A real table: the heading row supplies each column's name, and on
+             narrow screens, where it is hidden, every cell carries its own. -->
+        <div class="board__table" role="table" aria-label="Your guesses">
+          <div id="board-head" class="board__row board__head" role="row"></div>
+          <div id="board" role="rowgroup"></div>
+        </div>
+
+        <!-- Rows are inserted without moving focus, so the graded guess is
+             also announced here. -->
+        <p id="board-status" class="visually-hidden" role="status"></p>
       </section>
 
       <section class="legend" aria-labelledby="legend-title">

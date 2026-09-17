@@ -2,8 +2,7 @@
  * Sign-in / sign-up dialog and the header's session display.
  *
  * The dialog is a native `<dialog>` opened with `showModal()`, which supplies
- * the focus trap, the Escape handler, the inert background and the backdrop
- * that the previous hand-rolled `hidden` + opacity modal did not have.
+ * the focus trap, the Escape handler, the inert background and the backdrop.
  *
  * Authentication is a signed session cookie.
  */
@@ -11,7 +10,11 @@
 import { ApiError, authenticate, fetchCurrentUser, logout } from "./api.js";
 import { showToast } from "./toast.js";
 
-/** Shortest password the sign-up form will submit. See the note in README. */
+/**
+ * Shortest password the sign-up form will submit. A convenience for the
+ * player, not a control: the server does not check length, so a direct POST
+ * bypasses this.
+ */
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
@@ -29,18 +32,38 @@ const MIN_PASSWORD_LENGTH = 8;
  * @param {HTMLButtonElement} elements.signupButton
  * @param {HTMLButtonElement} elements.logoutButton
  * @param {HTMLButtonElement} elements.closeButton
+ * @param {(session: {username: string, guesses: string[]}|null) => void} elements.onSession
+ *   Called whenever the signed-in player changes, including the initial
+ *   cookie check. The board is filed per player, so it has to move with this.
  */
 export function createAuth(elements) {
   /** @type {"login"|"signup"} */
   let mode = "login";
-  /** @type {string|null} */
-  let currentUser = null;
+  /** @type {{username: string, guesses: string[]}|null} */
+  let session = null;
 
   function renderSession() {
-    const signedIn = currentUser !== null;
+    const signedIn = session !== null;
     elements.signedOut.hidden = signedIn;
     elements.signedIn.hidden = !signedIn;
-    elements.usernameDisplay.textContent = currentUser ?? "";
+    elements.usernameDisplay.textContent = session?.username ?? "";
+  }
+
+  /** @param {{username: string, guesses: string[]}|null} next */
+  function setSession(next) {
+    session = next;
+    renderSession();
+    elements.onSession(session);
+  }
+
+  /** @returns {Promise<{username: string, guesses: string[]}|null>} */
+  async function readSession() {
+    try {
+      return await fetchCurrentUser();
+    } catch {
+      // A failed session check should not block the game.
+      return null;
+    }
   }
 
   function open(nextMode) {
@@ -70,8 +93,10 @@ export function createAuth(elements) {
 
     elements.submit.disabled = true;
     try {
-      currentUser = await authenticate(mode, { username, password });
-      renderSession();
+      const name = await authenticate(mode, { username, password });
+      // `/login` and `/signup` only echo the name back; `/me` is what also
+      // carries the guesses the server has for this account today.
+      setSession((await readSession()) ?? { username: name, guesses: [] });
       close();
       showToast(
         mode === "login" ? "Logged in successfully." : "Account created.",
@@ -85,16 +110,16 @@ export function createAuth(elements) {
   }
 
   /**
-   * The server answers a duplicate username with a generic 500, so that case
-   * is translated here rather than shown raw.
+   * A duplicate username comes back as a bodyless 409, so that case is named
+   * here rather than shown as a bare status code.
    * @param {unknown} error
    * @param {"login"|"signup"} attemptedMode
    * @returns {string}
    */
   function describeAuthError(error, attemptedMode) {
     if (!(error instanceof ApiError)) return "Something went wrong. Try again.";
-    if (attemptedMode === "signup" && error.status === 500) {
-      return "Could not create that account. The name may already be taken.";
+    if (attemptedMode === "signup" && error.status === 409) {
+      return "That username is already taken.";
     }
     return error.message;
   }
@@ -103,8 +128,7 @@ export function createAuth(elements) {
     elements.logoutButton.disabled = true;
     try {
       await logout();
-      currentUser = null;
-      renderSession();
+      setSession(null);
       showToast("Logged out.", "success");
     } catch (error) {
       showToast(error instanceof ApiError ? error.message : "Could not log out.");
@@ -115,13 +139,7 @@ export function createAuth(elements) {
 
   /** Reads the existing session cookie, if any, on page load. */
   async function refresh() {
-    try {
-      currentUser = await fetchCurrentUser();
-    } catch {
-      // A failed session check should not block the game.
-      currentUser = null;
-    }
-    renderSession();
+    setSession(await readSession());
   }
 
   elements.loginButton.addEventListener("click", () => open("login"));
@@ -140,5 +158,5 @@ export function createAuth(elements) {
 
   renderSession();
 
-  return { refresh, isOpen: () => elements.dialog.open };
+  return { refresh, isOpen: () => elements.dialog.open, getSession: () => session };
 }

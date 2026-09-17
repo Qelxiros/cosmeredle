@@ -3,9 +3,8 @@
  *
  * The server sends three different status enums (see `GuessResponse` in
  * src/server.rs) and the UI has to colour, label and explain all of them.
- * Previously the colours lived in a JS lookup table and the explanations
- * lived in hand-written legend markup, so the two drifted apart freely.
- * Both are now derived from this module.
+ * The colours and the legend's explanations are both derived from this
+ * module, so the two cannot drift apart.
  *
  *   BinaryStatus  (name, world)     Correct | Incorrect
  *   TernaryStatus (book, species)   Correct | Adjacent | Incorrect
@@ -39,18 +38,20 @@ const STATUSES = {
 
 const UNKNOWN = { treatment: "incorrect", label: "Unknown" };
 
-/**
- * @param {unknown} status A status string from the server.
- * @returns {{treatment: string, label: string}} Never throws; an unrecognised
- *   status degrades to a neutral cell rather than an unstyled one.
- */
-export function describeStatus(status) {
-  return (typeof status === "string" && STATUSES[status]) || UNKNOWN;
-}
-
 /** @returns {boolean} True if this status string is one the server can send. */
 export function isKnownStatus(status) {
   return typeof status === "string" && Object.hasOwn(STATUSES, status);
+}
+
+/**
+ * @param {unknown} status A status string from the server.
+ * @returns {{treatment: string, label: string}} Never throws; an unrecognised
+ *   status degrades to a neutral cell rather than an unstyled one. The lookup
+ *   goes through `isKnownStatus` so that a payload carrying, say, `toString`
+ *   cannot reach an inherited `Object.prototype` member.
+ */
+export function describeStatus(status) {
+  return isKnownStatus(status) ? STATUSES[status] : UNKNOWN;
 }
 
 /** Legend entries, in the order they should be shown to the player. */
@@ -67,7 +68,7 @@ export const LEGEND = [
  *
  * `short` is the label printed inside each cell on narrow screens, where the
  * heading row is hidden and a column is only ~70px wide. `heading` is still
- * what the desktop header and every accessible name use.
+ * what the desktop header row and every accessible description use.
  */
 export const COLUMNS = [
   { key: "name", heading: "Name", short: "Name" },

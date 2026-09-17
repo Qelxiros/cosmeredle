@@ -14,10 +14,13 @@ ctrlc = "3.5.2"
 derive-debug = "0.1.2"
 futures = "0.3.34"
 futures-core = "0.3.34"
+governor = "0.10.4"
 http-body-util = "0.1.5"
 include_dir = "0.7.4"
 itertools = "0.15.0"
+log = "0.4.34"
 mediawiki = "0.5.1"
+rand = "0.10.2"
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
@@ -26,11 +29,16 @@ sha3 = "0.12.0"
 sqlx = { version = "0.8.6", features = ["_sqlite", "migrate", "sqlite"] }
 thiserror = "2.0.20"
 time = "0.3.55"
+titlecase = "3.6.0"
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
 tokio-cron-scheduler = "0.15.1"
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["auth", "compression-gzip", "fs", "limit", "trace"] }
 tower-sessions = { version = "0.14.0", features = ["signed"] }
 tower-sessions-sqlx-store = { version = "0.15.0", features = ["sqlite"] }
+tower_governor = { version = "0.8.0", features = ["axum", "tracing"] }
 tracing-subscriber = "0.3.23"
 uuid = "1.26.1"
+
+[dev-dependencies]
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }

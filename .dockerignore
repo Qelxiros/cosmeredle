@@ -1,0 +1,4 @@
+target/
+storage/
+.env
+.git

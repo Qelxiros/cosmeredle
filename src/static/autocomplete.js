@@ -1,15 +1,14 @@
 /**
  * Character-name autocomplete, wired as an ARIA combobox.
  *
- * Behaviour changes worth noting against the old implementation:
+ * Behaviour worth noting:
  *
- *  - Tab is no longer hijacked to cycle suggestions when nothing is
- *    highlighted. Swallowing Tab unconditionally trapped keyboard focus in
- *    the input. Arrow keys cycle; Tab accepts a highlighted suggestion and
- *    otherwise moves focus the way the player expects.
- *  - Suggestions are ranked (exact, then prefix, then word-start, then
- *    substring, then alphabetically) rather than sorted by a comparator that
- *    returned 0 for nearly every pair.
+ *  - Tab is not hijacked to cycle suggestions when nothing is highlighted;
+ *    swallowing Tab unconditionally would trap keyboard focus in the input.
+ *    Arrow keys cycle; Tab accepts a highlighted suggestion and otherwise
+ *    moves focus the way the player expects.
+ *  - Suggestions are ranked: exact, then prefix, then word-start, then
+ *    substring, then alphabetically.
  *  - Options are built with `textContent`, never interpolated into HTML.
  */
 
@@ -152,9 +151,9 @@ export function createAutocomplete({ input, list, getNames }) {
     }
   });
 
-  // `contains` keeps the list open while the player interacts with it; the old
-  // check compared against the list element itself and so closed on any click
-  // that landed on a suggestion's padding.
+  // `contains` keeps the list open while the player interacts with it;
+  // comparing against the list element itself would close it on a click that
+  // landed on a suggestion's padding.
   document.addEventListener("pointerdown", (event) => {
     if (!input.contains(event.target) && !list.contains(event.target)) {
       close();

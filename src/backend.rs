@@ -4,14 +4,21 @@ use tokio::task;
 
 use crate::{
     Error,
-    db::{self},
+    db::{self, get_user_auth_by_id},
     server,
 };
 
 #[derive(Clone, Copy)]
 pub struct Backend;
 
-impl AuthUser for db::User {
+#[derive(Debug, Clone)]
+pub struct UserAuth {
+    pub id: i64,
+    pub username: String,
+    pub bcrypt: String,
+}
+
+impl AuthUser for UserAuth {
     type Id = i64;
 
     fn id(&self) -> Self::Id {
@@ -24,7 +31,7 @@ impl AuthUser for db::User {
 }
 
 impl AuthnBackend for Backend {
-    type User = db::User;
+    type User = UserAuth;
     type Credentials = server::Auth;
     type Error = Error;
 
@@ -32,7 +39,7 @@ impl AuthnBackend for Backend {
         &self,
         creds: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
-        let user = db::get_user_by_username(&creds.username).await?;
+        let user = db::get_user_auth_by_name(&creds.username).await?;
 
         task::spawn_blocking(|| {
             Ok(user.filter(|user| verify(creds.password, &user.bcrypt).is_ok_and(|b| b)))
@@ -41,7 +48,7 @@ impl AuthnBackend for Backend {
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        db::get_user(*user_id).await
+        get_user_auth_by_id(*user_id).await
     }
 }
 

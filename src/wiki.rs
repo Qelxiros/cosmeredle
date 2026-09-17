@@ -13,10 +13,14 @@ use mediawiki::{
 };
 use regex::{Captures, Regex};
 use serde_json::Value;
+use titlecase::Titlecase;
 
 use crate::{
-    Character, Result,
-    db::{character_present, deactivate_characters, insert_character},
+    Book, Character, Result,
+    db::{
+        book_present, character_present, deactivate_characters, insert_book, insert_character,
+        reactivate_characters,
+    },
     err,
 };
 
@@ -24,17 +28,19 @@ static REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?<brackets>\[\[([^\|\]]*?\|)?(.*?)\]\])(\{\{.*?\}\})?|(?<braces>\{\{([^\|\}]*\|)([^\|]*?)(\|.*?)?\}\})(\{\{.*?\}\})?|(?<small><small>(.*?)</small>)").unwrap()
 });
 
-static TAGS: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| {
-    include_str!("../tags")
-        .lines()
-        .map(|s| s.split_once('=').unwrap())
-        .collect()
-});
+/// Coppermind's MediaWiki endpoint.
+pub const API_URL: &str = "https://coppermind.net/w/api.php";
+/// Templates whose transclusions define the character and book lists.
+pub const CHARACTER_TEMPLATE: &str = "Template:Character";
+pub const BOOK_TEMPLATE: &str = "Template:Book";
+/// Infobox names passed to `parse_table`.
+pub const CHARACTER_TABLE: &str = "character";
+pub const BOOK_TABLE: &str = "book";
 
 static API: OnceLock<Api> = OnceLock::new();
 
 pub(crate) async fn init() -> Result<()> {
-    let api = Api::new("https://coppermind.net/w/api.php").await?;
+    let api = Api::new(API_URL).await?;
     API.get_or_init(|| api);
 
     Ok(())
@@ -44,29 +50,26 @@ fn api() -> &'static Api {
     API.get().unwrap()
 }
 
-fn format(v: &str) -> String {
+/// Strips wiki markup (links, templates, `<small>`) and titlecases the result.
+pub fn format(v: &str) -> String {
     REGEX
         .replace_all(v, |cap: &Captures| {
             if cap.name("brackets").is_some() {
                 cap[3].to_string()
             } else if cap.name("braces").is_some() {
-                let left = &cap[6];
-                let right = &cap[7];
-                if left == "tag+|" {
-                    TAGS.get(right).copied().unwrap_or(right).to_string()
-                } else {
-                    cap[7].to_string()
-                }
+                cap[7].to_string()
             } else {
                 String::new()
             }
         })
         .trim()
         .to_string()
+        .titlecase()
 }
 
-fn format_abilities(v: &str) -> Vec<String> {
-    static BAD: LazyLock<HashSet<&str>> = LazyLock::new(|| ["others"].into_iter().collect());
+/// Splits a comma-separated `abilities` field into formatted entries.
+pub fn format_abilities(v: &str) -> Vec<String> {
+    static BAD: LazyLock<HashSet<&str>> = LazyLock::new(|| ["Others", ""].into_iter().collect());
 
     v.split(',')
         .map(|s| format(s.trim()))
@@ -74,8 +77,10 @@ fn format_abilities(v: &str) -> Vec<String> {
         .collect()
 }
 
-fn parse_table(wikitext: &str) -> Option<HashMap<&str, &str>> {
-    let start = wikitext.find("{{character")?;
+/// Extracts the named infobox from a page's wikitext as key/value pairs.
+pub fn parse_table(wikitext: &str, table: &str) -> Option<HashMap<String, String>> {
+    let prefix = "{{".to_string() + table;
+    let start = wikitext.find(&prefix)?;
     let mut count = 0;
     let len = wikitext.split_at(start).1.find(|c| {
         match c {
@@ -89,22 +94,23 @@ fn parse_table(wikitext: &str) -> Option<HashMap<&str, &str>> {
 
     Some(
         table
-            .strip_prefix("{{character")?
+            .strip_prefix(&prefix)?
             .strip_suffix("}}")?
             .trim()
             .lines()
             .filter_map(|s| s.strip_prefix('|')?.split_once('='))
+            .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
             .collect(),
     )
 }
 
-pub async fn get_character_pages() -> Result<HashSet<String>> {
+pub async fn get_template_pages(template: &str) -> Result<HashSet<String>> {
     let mut pages = vec![];
     let mut cont = Value::Null;
 
     loop {
         let chunk = ActionApiList::embeddedin()
-            .eipageid(282)
+            .eititle(template)
             .einamespace(&[0])
             .eilimit(500)
             .continue_from(&cont)
@@ -128,7 +134,7 @@ pub async fn get_character_pages() -> Result<HashSet<String>> {
         .collect())
 }
 
-pub async fn get_character(name: &str) -> Result<Character> {
+async fn get_page_table(name: &str, table: &str) -> Result<HashMap<String, String>> {
     let val = ActionApiQuery::revisions()
         .titles(&[name])
         .rvprop(&["ids", "content", "contentmodel", "timestamp", "flags"])
@@ -147,14 +153,18 @@ pub async fn get_character(name: &str) -> Result<Character> {
         .and_then(|x| x.first().and_then(|x| x["slots"]["main"]["*"].as_str()))
         .ok_or(err!("failed to get wikitext"))?;
 
-    let map = parse_table(text).ok_or(err!("No table found"))?;
+    parse_table(text, table).ok_or(err!("No table found"))
+}
+
+pub async fn get_character(name: &str) -> Result<Character> {
+    let map = get_page_table(name, CHARACTER_TABLE).await?;
     let mut out = Character::default();
 
     for (k, v) in map {
         if k == "abilities" {
-            out.abilities(format_abilities(v));
+            out.abilities(format_abilities(&v));
         } else {
-            out.add(k, format(v));
+            out.add(&k, format(&v));
         }
     }
     out.name(name.to_string());
@@ -162,17 +172,51 @@ pub async fn get_character(name: &str) -> Result<Character> {
     Ok(out)
 }
 
+pub async fn get_book(name: &str) -> Result<Book> {
+    let map = get_page_table(name, BOOK_TABLE).await?;
+
+    Ok(Book {
+        title: name.to_string(),
+        series: map.get("series").map(|s| format(s)),
+    })
+}
+
 pub async fn sync_characters() -> Result<()> {
-    let names = get_character_pages().await?.into_iter().collect_vec();
+    let names = get_template_pages(CHARACTER_TEMPLATE)
+        .await?
+        .into_iter()
+        .collect_vec();
     deactivate_characters(&names).await?;
+    reactivate_characters(&names).await?;
     for name in names {
         if character_present(&name).await {
             continue;
         }
 
         let character = get_character(&name).await;
-        if let Ok(ch) = character {
-            insert_character(&ch).await?;
+        if let Ok(ch) = character
+            && let Err(e) = insert_character(&ch).await
+        {
+            log::warn!("Failed to insert character {ch:?}: {e}");
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn sync_books() -> Result<()> {
+    let titles = get_template_pages(BOOK_TEMPLATE)
+        .await?
+        .into_iter()
+        .collect_vec();
+    for title in titles {
+        if book_present(&title).await {
+            continue;
+        }
+
+        let book = get_book(&title).await;
+        if let Ok(b) = book {
+            insert_book(&b).await?;
         }
     }
 

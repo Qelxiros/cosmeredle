@@ -5,7 +5,7 @@ use axum_login::tower_sessions::session_store;
 use bcrypt::BcryptError;
 use mediawiki::MediaWikiError;
 use serde::{Deserialize, Serialize};
-use sqlx::types::Json;
+use sqlx::{error::ErrorKind, types::Json};
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio_cron_scheduler::JobSchedulerError;
@@ -50,6 +50,10 @@ pub enum Error {
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         match self {
+            Self::Sql(sqlx::Error::Database(d)) if d.kind() == ErrorKind::UniqueViolation => {
+                return StatusCode::CONFLICT.into_response();
+            }
+
             Self::Bcrypt(_)
             | Self::CborDe(_)
             | Self::CborSer(_)
@@ -125,6 +129,12 @@ pub struct Character {
     hide_world: bool,
     universe: String,
     introduced: String,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Book {
+    pub title: String,
+    pub series: Option<String>,
 }
 
 impl Character {

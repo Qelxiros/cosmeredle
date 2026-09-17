@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS book (
+  title TEXT NOT NULL PRIMARY KEY,
+  series TEXT
+);
