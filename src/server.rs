@@ -6,7 +6,7 @@ use axum::{
     http::{Response, StatusCode},
     response::{Html, IntoResponse},
 };
-use bcrypt::hash;
+use bcrypt::{hash, verify};
 use chrono::Local;
 use derive_debug::Dbg;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,10 @@ use crate::{
     Character, Result,
     answer::today,
     backend::AuthSession,
-    db::{self, DATE_FORMAT, all_characters, get_book, get_character, get_guesses},
+    db::{
+        self, DATE_FORMAT, all_characters, change_user_password, get_book, get_character,
+        get_guesses,
+    },
     err,
 };
 
@@ -251,4 +254,32 @@ pub async fn handle_logout(mut auth_session: AuthSession) -> impl IntoResponse {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChangePassword {
+    old: String,
+    new: String,
+}
+
+pub async fn handle_change_password(
+    auth_session: AuthSession,
+    Json(body): Json<ChangePassword>,
+) -> Result<()> {
+    let user = auth_session
+        .user
+        .ok_or(err!("reached /me handler without logging in"))?;
+
+    let bcrypt = task::spawn_blocking(move || {
+        if verify(body.old, &user.bcrypt)? {
+            Ok(hash(body.new, BCRYPT_COST)?)
+        } else {
+            Err(user_err!("incorrect username or password"))
+        }
+    })
+    .await??;
+
+    change_user_password(&user.username, &bcrypt).await?;
+
+    Ok(())
 }

@@ -14,7 +14,8 @@ use cosmeredle::{
     backend::Backend,
     db, err, init,
     server::{
-        day, handle_guess, handle_list, handle_login, handle_logout, handle_signup, home, me,
+        day, handle_change_password, handle_guess, handle_list, handle_login, handle_logout,
+        handle_signup, home, me,
     },
     wiki::sync_characters,
 };
@@ -89,6 +90,7 @@ async fn start() -> Result<()> {
     let app = Router::<()>::new()
         .route("/me", get(me))
         .route("/logout", post(handle_logout))
+        .route("/change_password", post(handle_change_password))
         .route_layer(login_required!(Backend))
         .route("/guess", post(handle_guess))
         .route("/list", get(handle_list))

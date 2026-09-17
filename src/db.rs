@@ -90,6 +90,18 @@ pub async fn get_user_auth_by_name(username: &str) -> Result<Option<UserAuth>> {
     .await?)
 }
 
+pub async fn change_user_password(username: &str, new_bcrypt: &str) -> Result<()> {
+    query!(
+        "UPDATE user SET bcrypt = $2 WHERE username = $1",
+        username,
+        new_bcrypt
+    )
+    .execute(conn())
+    .await?;
+
+    Ok(())
+}
+
 pub async fn insert_guess(user_id: UserId<Backend>, guess: String) -> Result<()> {
     let mut day = String::new();
     Local::now()
