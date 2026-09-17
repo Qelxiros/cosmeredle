@@ -49,7 +49,7 @@ FROM debian:bookworm-slim AS runtime
 # system trust store. tzdata: the puzzle rolls over on Local::now(), which is
 # UTC unless the zoneinfo database is present and TZ names a zone.
 RUN apt-get update \
-    && apt-get install --no-install-recommends --yes ca-certificates tzdata \
+    && apt-get install --no-install-recommends --yes ca-certificates tzdata sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
