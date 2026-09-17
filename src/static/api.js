@@ -250,3 +250,24 @@ export async function authenticate(mode, credentials) {
 export async function logout() {
   await request("/logout", { method: "POST" });
 }
+
+/**
+ * Replaces the signed-in player's password.
+ *
+ * The route answers with an empty 200 (`Result<()>`), so there is nothing to
+ * decode. A wrong current password is `Error::User`, i.e. a 400 carrying
+ * "incorrect username or password" — the same text `/login` uses, which is why
+ * the caller rewords it rather than showing it.
+ *
+ * Note what this does to the session: `UserAuth::session_auth_hash` is the
+ * bcrypt hash itself (src/backend.rs), and axum-login compares the hash stored
+ * in the session against the user's current one on every request. Changing the
+ * password therefore invalidates this session — the very next request arrives
+ * signed out — so the caller has to re-establish it.
+ *
+ * @param {{current: string, next: string}} passwords
+ * @returns {Promise<void>}
+ */
+export async function changePassword({ current, next }) {
+  await post("/change_password", { old: current, new: next });
+}

@@ -58,9 +58,14 @@
 
         <div id="auth-signed-in" class="auth-status" hidden>
           <span id="auth-username-display" class="auth-status__name"></span>
-          <button id="logout-button" type="button" class="btn btn--link">
-            Log Out
-          </button>
+          <div class="auth-status__actions">
+            <button id="password-button" type="button" class="btn btn--link">
+              Change Password
+            </button>
+            <button id="logout-button" type="button" class="btn btn--link">
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -104,6 +109,87 @@
 
         <button id="auth-submit" type="submit" class="btn btn--primary">
           Log In
+        </button>
+      </form>
+    </dialog>
+
+    <dialog
+      id="password-dialog"
+      class="dialog"
+      aria-labelledby="password-title"
+    >
+      <button
+        id="password-close"
+        type="button"
+        class="btn--icon dialog__close"
+        aria-label="Close"
+      >
+        &times;
+      </button>
+
+      <h2 id="password-title" class="dialog__title">Change Password</h2>
+
+      <form id="password-form" class="dialog__form">
+        <!--
+          Not editable and not submitted: password managers file a new
+          credential against the username in the same form, and offer to update
+          the right account only if they can see one.
+        -->
+        <input
+          id="password-username"
+          class="visually-hidden"
+          type="text"
+          name="username"
+          autocomplete="username"
+          tabindex="-1"
+          aria-hidden="true"
+          readonly
+        />
+
+        <div class="field">
+          <label class="field__label" for="password-current">
+            Current Password
+          </label>
+          <input
+            id="password-current"
+            class="input"
+            type="password"
+            name="current-password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password-new">New Password</label>
+          <input
+            id="password-new"
+            class="input"
+            type="password"
+            name="new-password"
+            autocomplete="new-password"
+            minlength="8"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password-confirm">
+            Confirm New Password
+          </label>
+          <input
+            id="password-confirm"
+            class="input"
+            type="password"
+            name="confirm-password"
+            autocomplete="new-password"
+            minlength="8"
+            required
+          />
+        </div>
+
+        <button id="password-submit" type="submit" class="btn btn--primary">
+          Change Password
         </button>
       </form>
     </dialog>

@@ -1,21 +1,32 @@
 /**
- * Sign-in / sign-up dialog and the header's session display.
+ * Sign-in / sign-up and change-password dialogs, and the header's session
+ * display.
  *
- * The dialog is a native `<dialog>` opened with `showModal()`, which supplies
+ * Both dialogs are native `<dialog>`s opened with `showModal()`, which supplies
  * the focus trap, the Escape handler, the inert background and the backdrop.
  *
  * Authentication is a signed session cookie.
  */
 
-import { ApiError, authenticate, fetchCurrentUser, logout } from "./api.js";
+import {
+  ApiError,
+  authenticate,
+  changePassword,
+  fetchCurrentUser,
+  logout,
+} from "./api.js";
 import { showToast } from "./toast.js";
 
 /**
- * Shortest password the sign-up form will submit. A convenience for the
- * player, not a control: the server does not check length, so a direct POST
- * bypasses this.
+ * Shortest password either form will submit. `handle_signup` enforces this
+ * server-side too; `handle_change_password` does not, so on that form it is a
+ * convenience for the player rather than a control, and a direct POST can still
+ * set a shorter one.
  */
 const MIN_PASSWORD_LENGTH = 8;
+
+/** Assumed wait when a 429 arrives without a header naming one. */
+const RATE_LIMIT_FALLBACK_MS = 4000;
 
 /**
  * @param {object} elements
@@ -32,6 +43,15 @@ const MIN_PASSWORD_LENGTH = 8;
  * @param {HTMLButtonElement} elements.signupButton
  * @param {HTMLButtonElement} elements.logoutButton
  * @param {HTMLButtonElement} elements.closeButton
+ * @param {HTMLDialogElement} elements.passwordDialog
+ * @param {HTMLFormElement} elements.passwordForm
+ * @param {HTMLInputElement} elements.passwordUsername Hidden; for password managers.
+ * @param {HTMLInputElement} elements.passwordCurrent
+ * @param {HTMLInputElement} elements.passwordNew
+ * @param {HTMLInputElement} elements.passwordConfirm
+ * @param {HTMLButtonElement} elements.passwordSubmit
+ * @param {HTMLButtonElement} elements.passwordButton Opens the dialog.
+ * @param {HTMLButtonElement} elements.passwordCloseButton
  * @param {(session: {username: string, guesses: string[]}|null) => void} elements.onSession
  *   Called whenever the signed-in player changes, including the initial
  *   cookie check. The board is filed per player, so it has to move with this.
@@ -124,6 +144,95 @@ export function createAuth(elements) {
     return error.message;
   }
 
+  function openPassword() {
+    if (session === null) return;
+
+    elements.passwordForm.reset();
+    // After the reset, which would otherwise blank it.
+    elements.passwordUsername.value = session.username;
+    elements.passwordDialog.showModal();
+    elements.passwordCurrent.focus();
+  }
+
+  function closePassword() {
+    elements.passwordDialog.close();
+  }
+
+  /**
+   * Changing the password ends the session it was changed from: axum-login
+   * stores the bcrypt hash as the session's auth hash and re-checks it on every
+   * request (see api.js). Signing straight back in with the new password is
+   * what keeps the player on their own board — an anonymous board is a
+   * different localStorage key, so being dropped to one looks like today's
+   * guesses have been lost.
+   */
+  async function submitPasswordChange(event) {
+    event.preventDefault();
+
+    const username = session?.username;
+    if (username === undefined) return;
+
+    const current = elements.passwordCurrent.value;
+    const next = elements.passwordNew.value;
+    const confirmed = elements.passwordConfirm.value;
+    if (current === "" || next === "") return;
+
+    if (next.length < MIN_PASSWORD_LENGTH) {
+      showToast(
+        `Your new password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      );
+      return;
+    }
+    if (next !== confirmed) {
+      showToast("The two new passwords do not match.");
+      return;
+    }
+    if (next === current) {
+      showToast("That is already your password.");
+      return;
+    }
+
+    elements.passwordSubmit.disabled = true;
+    try {
+      await changePassword({ current, next });
+    } catch (error) {
+      showToast(describePasswordError(error));
+      return;
+    } finally {
+      elements.passwordSubmit.disabled = false;
+    }
+
+    // Past this point the password *has* changed, so nothing below may report
+    // a failure in a way that reads as though it had not.
+    closePassword();
+    try {
+      await authenticate("login", { username, password: next });
+      setSession((await readSession()) ?? { username, guesses: [] });
+      showToast("Password changed.", "success");
+    } catch {
+      setSession(null);
+      showToast("Password changed. Log in again with your new password.", "success");
+    }
+  }
+
+  /**
+   * A wrong current password comes back as `Error::User`, whose text
+   * ("incorrect username or password") is written for `/login` and reads as a
+   * non sequitur here, where no username was in question.
+   * @param {unknown} error
+   * @returns {string}
+   */
+  function describePasswordError(error) {
+    if (!(error instanceof ApiError)) return "Something went wrong. Try again.";
+    if (error.status === 400) return "Your current password is incorrect.";
+    if (error.status === 401) return "Your session has expired. Log in again.";
+    if (error.status === 429) {
+      const seconds = Math.ceil((error.retryAfterMs ?? RATE_LIMIT_FALLBACK_MS) / 1000);
+      return `Too many requests. Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
+    }
+    return error.message;
+  }
+
   async function signOut() {
     elements.logoutButton.disabled = true;
     try {
@@ -148,15 +257,31 @@ export function createAuth(elements) {
   elements.closeButton.addEventListener("click", close);
   elements.form.addEventListener("submit", submit);
 
+  elements.passwordButton.addEventListener("click", openPassword);
+  elements.passwordCloseButton.addEventListener("click", closePassword);
+  elements.passwordForm.addEventListener("submit", submitPasswordChange);
+
   // A click landing on the dialog element itself is a click on the backdrop;
   // clicks inside the content are retargeted to their own element.
   elements.dialog.addEventListener("click", (event) => {
     if (event.target === elements.dialog) close();
   });
+  elements.passwordDialog.addEventListener("click", (event) => {
+    if (event.target === elements.passwordDialog) closePassword();
+  });
 
+  // Also clears the typed passwords out of the DOM on Escape.
   elements.dialog.addEventListener("close", () => elements.form.reset());
+  elements.passwordDialog.addEventListener("close", () =>
+    elements.passwordForm.reset(),
+  );
 
   renderSession();
 
-  return { refresh, isOpen: () => elements.dialog.open, getSession: () => session };
+  return {
+    refresh,
+    // The board must not pull focus out of either dialog.
+    isOpen: () => elements.dialog.open || elements.passwordDialog.open,
+    getSession: () => session,
+  };
 }

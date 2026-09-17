@@ -319,6 +319,11 @@ h3,
   white-space: nowrap;
 }
 
+.auth-status__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
 .auth-actions {
   display: flex;
   gap: 0.75rem;

@@ -78,6 +78,15 @@ const auth = createAuth({
   loginButton: byId("login-button"),
   signupButton: byId("signup-button"),
   logoutButton: byId("logout-button"),
+  passwordDialog: byId("password-dialog"),
+  passwordForm: byId("password-form"),
+  passwordUsername: byId("password-username"),
+  passwordCurrent: byId("password-current"),
+  passwordNew: byId("password-new"),
+  passwordConfirm: byId("password-confirm"),
+  passwordSubmit: byId("password-submit"),
+  passwordButton: byId("password-button"),
+  passwordCloseButton: byId("password-close"),
   onSession: (session) => {
     openBoard(session);
   },
